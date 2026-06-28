@@ -1,2 +1,5 @@
-.vercel
+.next/
+.vercel/
 .vercel-*
+node_modules/
+npm-debug.log*

@@ -11,7 +11,8 @@
   --rose: #b24a55;
   --slot-morning-one: #f5f8fb;
   --slot-morning-two: #eef8f3;
-  --slot-afternoon: #fff5df;
+  --slot-afternoon-one: #fff5df;
+  --slot-afternoon-two: #fff0f3;
   --closed: #fffdfd;
   --closed-line: #fae9ee;
   --closed-text: #c08b96;
@@ -119,14 +120,11 @@ h2 {
 }
 
 .calendar-panel {
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow);
-}
-
-.calendar-panel {
-  overflow: hidden;
 }
 
 .calendar-toolbar {
@@ -177,6 +175,8 @@ h2 {
 .legend span {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
   min-height: 26px;
   border-radius: 999px;
@@ -194,6 +194,16 @@ h2 {
   font-weight: 800;
 }
 
+.legend em {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.78em;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+}
+
 .legend-dot {
   display: none;
 }
@@ -206,8 +216,12 @@ h2 {
   background: var(--slot-morning-two);
 }
 
-.afternoon {
-  background: var(--slot-afternoon);
+.afternoon-one {
+  background: var(--slot-afternoon-one);
+}
+
+.afternoon-two {
+  background: var(--slot-afternoon-two);
 }
 
 .weekdays,
@@ -295,8 +309,12 @@ h2 {
   background: var(--slot-morning-two);
 }
 
-.assignment[data-slot="오후"] {
-  background: var(--slot-afternoon);
+.assignment[data-slot="오후1"] {
+  background: var(--slot-afternoon-one);
+}
+
+.assignment[data-slot="오후2"] {
+  background: var(--slot-afternoon-two);
 }
 
 .event-item {
@@ -404,7 +422,7 @@ h2 {
 
   .legend {
     gap: 6px 10px;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
   }
 
   .legend span {
@@ -522,15 +540,15 @@ h2 {
 
   .legend {
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     width: 100%;
     gap: 6px;
-    font-size: 0.9rem;
+    font-size: 0.76rem;
   }
 
   .legend span {
     justify-content: center;
-    flex: 1 1 0;
+    flex: 1 1 calc(50% - 6px);
     min-height: 30px;
     padding: 5px 6px;
   }
@@ -553,7 +571,7 @@ h2 {
   }
 
   .day-card {
-    min-height: 84px;
+    min-height: 100px;
     padding: 5px;
     border-right: 1px solid var(--line);
   }
