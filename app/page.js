@@ -153,7 +153,7 @@ const schedule = {
 
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 const dutySlots = [
-  { name: "오전1", time: "7:30 ~ 17:30", className: "morning-one" },
+  { name: "오전1", time: "7:30 ~ 16:30", className: "morning-one" },
   { name: "오전2", time: "8:00 ~ 17:00", className: "morning-two" },
   {
     name: "오후1",
