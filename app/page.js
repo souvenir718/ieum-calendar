@@ -161,7 +161,8 @@ const printConfig = {
   dutyHours: [
     { label: "오전1", time: "오전 7시 30분 ~ 9시" },
     { label: "오전2", time: "오전 8시 ~ 9시" },
-    { label: "오후", time: "오후 4시 30분 ~ 6시" },
+    { label: "오후1", time: "오후 4시 30분 ~ 6시 30분" },
+    { label: "오후2", time: "오후 4시 30분 ~ 7시 30분" },
   ],
   dutyNote: "※ 보육교사 - 1개월 단위 탄력적 근로제",
   // 조기퇴근 표기법 (퇴근시간)
