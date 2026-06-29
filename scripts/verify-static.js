@@ -117,6 +117,9 @@ const slotWeekdayCounts = Object.fromEntries(
 const dayPatterns = new Set();
 let previousAfternoonTwo = "";
 let previousAfternoonOne = "";
+let previousDayAssignments = null;
+let afternoonOneNextDayDuty = 0;
+const afternoonOneNextDayDutyDays = [];
 
 for (const [, date, block] of dateBlocks) {
   const weekday = weekdayLabels[new Date(`${date}T00:00:00Z`).getUTCDay()];
@@ -163,6 +166,21 @@ for (const [, date, block] of dateBlocks) {
     process.exit(1);
   }
 
+  // (소프트) 오후1 담당자가 다음 근무일에 오전 당직을 맡은 경우 — 실패는 아니고 집계만
+  if (previousAfternoonOne && morningTeachers.includes(previousAfternoonOne)) {
+    afternoonOneNextDayDuty += 1;
+    afternoonOneNextDayDutyDays.push(`${date}(${previousAfternoonOne})`);
+  }
+
+  if (previousDayAssignments) {
+    for (const slot of ["오전1", "오전2", "오후1", "오후2"]) {
+      if (dayAssignments[slot] === previousDayAssignments[slot]) {
+        console.error(`${dayAssignments[slot]} has consecutive ${slot} duty ending on ${date}.`);
+        process.exit(1);
+      }
+    }
+  }
+
   for (const [slot, person] of Object.entries(dayAssignments)) {
     weekdayCounts[person][weekday] += 1;
     slotWeekdayCounts[person][slot][weekday] += 1;
@@ -170,6 +188,7 @@ for (const [, date, block] of dateBlocks) {
 
   previousAfternoonTwo = dayAssignments["오후2"];
   previousAfternoonOne = dayAssignments["오후1"];
+  previousDayAssignments = dayAssignments;
 }
 
 for (const [person, counts] of Object.entries(weekdayCounts)) {
@@ -197,6 +216,14 @@ for (const [person, slots] of Object.entries(slotWeekdayCounts)) {
       }
     }
   }
+}
+
+if (afternoonOneNextDayDuty === 0) {
+  console.log("[soft] 오후1 담당자는 다음 근무일에 당직 없음 (충돌 0건).");
+} else {
+  console.warn(
+    `[soft] 오후1 담당자가 다음 근무일에 오전 당직을 맡은 경우 ${afternoonOneNextDayDuty}건: ${afternoonOneNextDayDutyDays.join(", ")}`,
+  );
 }
 
 console.log("Next calendar files verified.");
