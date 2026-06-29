@@ -116,6 +116,7 @@ const slotWeekdayCounts = Object.fromEntries(
 );
 const dayPatterns = new Set();
 let previousAfternoonTwo = "";
+let previousAfternoonOne = "";
 
 for (const [, date, block] of dateBlocks) {
   const weekday = weekdayLabels[new Date(`${date}T00:00:00Z`).getUTCDay()];
@@ -157,12 +158,18 @@ for (const [, date, block] of dateBlocks) {
     process.exit(1);
   }
 
+  if (previousAfternoonOne && afternoonTeachers.includes(previousAfternoonOne)) {
+    console.error(`${previousAfternoonOne} has afternoon duty on ${date} after previous 오후1 duty.`);
+    process.exit(1);
+  }
+
   for (const [slot, person] of Object.entries(dayAssignments)) {
     weekdayCounts[person][weekday] += 1;
     slotWeekdayCounts[person][slot][weekday] += 1;
   }
 
   previousAfternoonTwo = dayAssignments["오후2"];
+  previousAfternoonOne = dayAssignments["오후1"];
 }
 
 for (const [person, counts] of Object.entries(weekdayCounts)) {
