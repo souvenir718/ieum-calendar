@@ -135,6 +135,12 @@ h2 {
   border-bottom: 1px solid var(--line);
 }
 
+.toolbar-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .calendar-tabs {
   display: inline-flex;
   align-items: center;
@@ -143,6 +149,22 @@ h2 {
   border-radius: 999px;
   background: var(--surface-soft);
   padding: 4px;
+}
+
+.print-button {
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  background: var(--blue);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.print-button:hover {
+  filter: brightness(1.06);
 }
 
 .tab-button {
@@ -488,6 +510,10 @@ h2 {
     background: var(--bg);
   }
 
+  .print-button {
+    display: none;
+  }
+
   .app-shell {
     width: min(100% - 12px, 1480px);
     padding: 14px 0 16px;
@@ -621,5 +647,154 @@ h2 {
   .muted-label {
     color: var(--closed-text);
     padding-left: 0;
+  }
+}
+
+/* ───────────────────────────────────────────────
+   인쇄(PDF)용 레이아웃 — 화면에서는 숨김
+   ─────────────────────────────────────────────── */
+.print-sheet {
+  display: none;
+}
+
+.print-sheet * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.print-title {
+  text-align: center;
+  font-size: 20pt;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  margin: 0 0 6px;
+}
+
+.print-section {
+  text-align: center;
+  font-size: 12pt;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  margin: 8px 0 4px;
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #000;
+  padding: 3px 2px;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 8.5pt;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+.print-table th {
+  background: #d9d9d9;
+  font-weight: 700;
+}
+
+.duty-date-row td,
+.duty-date-row th {
+  background: #d9d9d9;
+  font-weight: 700;
+}
+
+.duty-table th:first-child {
+  width: 84px;
+}
+
+.holiday-cell {
+  color: #c00000;
+  font-weight: 700;
+}
+
+.date-red {
+  color: #c00000;
+  font-weight: 700;
+}
+
+.date-blue {
+  color: #1144cc;
+  font-weight: 700;
+}
+
+.legend-table {
+  margin-top: 5px;
+}
+
+.legend-table th:first-child {
+  width: 84px;
+}
+
+.print-note {
+  margin: 4px 0 0;
+  font-size: 8.5pt;
+}
+
+.early-table td {
+  height: 60px;
+  vertical-align: top;
+  text-align: left;
+  padding: 4px;
+}
+
+.early-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.early-date {
+  font-weight: 700;
+}
+
+.early-holiday {
+  color: #c00000;
+  font-weight: 700;
+}
+
+.viewers-table {
+  margin-top: 8px;
+}
+
+.viewers-label {
+  width: 48px;
+}
+
+.viewers-sign td {
+  height: 48px;
+}
+
+.print-footer {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 2px 0;
+  font-size: 8.5pt;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .app-shell {
+    display: none !important;
+  }
+
+  .print-sheet {
+    display: block !important;
+    color: #000;
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 const schedule = {
   month: "2026-07",
@@ -151,6 +151,42 @@ const schedule = {
   events: {},
 };
 
+// ───────────────────────────────────────────────────────────────
+// 인쇄(PDF)용 추가 설정 — 실제 값으로 수정해서 사용하세요.
+// ───────────────────────────────────────────────────────────────
+const printConfig = {
+  title: "2026년 7월 당직 및 조기퇴근",
+  org: "이음어린이집",
+  // 당직시간 표기법
+  dutyHours: [
+    { label: "오전1", time: "오전 7시 30분 ~ 9시" },
+    { label: "오전2", time: "오전 8시 ~ 9시" },
+    { label: "오후", time: "오후 4시 30분 ~ 6시" },
+  ],
+  dutyNote: "※ 보육교사 - 1개월 단위 탄력적 근로제",
+  // 조기퇴근 표기법 (퇴근시간)
+  earlyLegend: [
+    { label: "0.5", time: "오후 5시 30분" },
+    { label: "1", time: "오후 5시" },
+    { label: "1.5", time: "오후 4시 30분" },
+    { label: "2", time: "오후 4시" },
+  ],
+  earlyNote:
+    "※ 오전 당직 근무에 따른 주 40시간 초과근무는 평일 근무 시간을 단축하며, 18시 이후 연장반 당직은 시간 외 수당을 지급함.",
+  // 공람 서명란: 직급/반별 담당자
+  viewers: [
+    { group: "원장", members: ["김윤경"] },
+    { group: "포근반", members: ["이혜빈", "정지혜", "홍여진"] },
+    { group: "다솜반", members: ["김민경", "최옥희"] },
+    { group: "도담반", members: ["어영경"] },
+    { group: "라온반", members: ["봉은영"] },
+  ],
+  footerNote: "※ 위 표의 내용은 변경될 수 있습니다.",
+};
+
+// 조기퇴근 내역: { "2026-07-02": [["이름", "1.5"], ...] } 형태로 채우세요.
+const earlyLeave = {};
+
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 const dutySlots = [
   { name: "오전1", time: "7:30 ~ 16:30", className: "morning-one" },
@@ -193,6 +229,44 @@ function getMonthDays() {
   return Array.from({ length: 31 }, (_, index) => getDateMeta(index + 1));
 }
 
+// 월~토(일요일 제외)를 주 단위로 묶는다. 각 주는 [월,화,수,목,금,토] 6칸.
+function getDutyWeeks() {
+  const weeks = [];
+  for (const day of getMonthDays()) {
+    const weekdayIndex = new Date(Date.UTC(2026, 6, day.day)).getUTCDay();
+    if (weekdayIndex === 0) continue; // 일요일 제외
+    const col = weekdayIndex - 1; // 월=0 ... 토=5
+    if (col === 0 || weeks.length === 0) weeks.push(Array(6).fill(null));
+    weeks[weeks.length - 1][col] = day;
+  }
+  return weeks;
+}
+
+// 당직표 한 칸의 표시 정보
+function dutyCellInfo(day) {
+  if (!day) return { type: "empty" };
+  const weekdayIndex = new Date(Date.UTC(2026, 6, day.day)).getUTCDay();
+  const base = { day: day.day, weekdayIndex, holidayName: day.holidayName };
+  if (day.holidayName) return { ...base, type: "holiday" };
+  if (weekdayIndex === 6 || day.assignments.length === 0)
+    return { ...base, type: "dash" };
+  const pick = (slot) =>
+    (day.assignments.find((entry) => entry[0] === slot) || [])[1] || "";
+  return {
+    ...base,
+    type: "duty",
+    morning: [pick("오전1"), pick("오전2")].filter(Boolean).join("/"),
+    afternoon: [pick("오후1"), pick("오후2")].filter(Boolean).join("/"),
+  };
+}
+
+function dutyDateClass(cell) {
+  if (cell.type === "empty") return "";
+  if (cell.holidayName || cell.weekdayIndex === 0) return "date-red";
+  if (cell.weekdayIndex === 6) return "date-blue";
+  return "";
+}
+
 function DayCard({ activeView, day }) {
   const classes = ["day-card"];
   if (day.isWeekend) classes.push("is-weekend");
@@ -232,12 +306,178 @@ function DayCard({ activeView, day }) {
   );
 }
 
+function PrintSheet() {
+  const weeks = getDutyWeeks();
+
+  return (
+    <div className="print-sheet" aria-hidden="true">
+      <h1 className="print-title">{printConfig.title}</h1>
+
+      <h2 className="print-section">&lt; 당 직 &gt;</h2>
+      <table className="print-table duty-table">
+        <tbody>
+          {weeks.map((week, weekIndex) => {
+            const cells = week.map(dutyCellInfo);
+            return (
+              <Fragment key={`week-${weekIndex}`}>
+                <tr className="duty-date-row">
+                  <th>날짜</th>
+                  {cells.map((cell, cellIndex) => (
+                    <td className={dutyDateClass(cell)} key={`d-${cellIndex}`}>
+                      {cell.day ?? ""}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <th>오전1/오전2</th>
+                  {cells.map((cell, cellIndex) => {
+                    if (cell.type === "duty")
+                      return <td key={`m-${cellIndex}`}>{cell.morning}</td>;
+                    if (cell.type === "holiday")
+                      return (
+                        <td className="holiday-cell" rowSpan={2} key={`m-${cellIndex}`}>
+                          {cell.holidayName}
+                        </td>
+                      );
+                    if (cell.type === "dash")
+                      return (
+                        <td rowSpan={2} key={`m-${cellIndex}`}>
+                          –
+                        </td>
+                      );
+                    return <td rowSpan={2} key={`m-${cellIndex}`} />;
+                  })}
+                </tr>
+                <tr>
+                  <th>오후</th>
+                  {cells.map((cell, cellIndex) =>
+                    cell.type === "duty" ? (
+                      <td key={`a-${cellIndex}`}>{cell.afternoon}</td>
+                    ) : null,
+                  )}
+                </tr>
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <table className="print-table legend-table">
+        <tbody>
+          <tr>
+            <th>표기법</th>
+            {printConfig.dutyHours.map((item) => (
+              <td key={item.label}>{item.label}</td>
+            ))}
+          </tr>
+          <tr>
+            <th>당직시간</th>
+            {printConfig.dutyHours.map((item) => (
+              <td key={item.label}>{item.time}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <p className="print-note">{printConfig.dutyNote}</p>
+
+      <h2 className="print-section">&lt; 조기퇴근 &gt;</h2>
+      <table className="print-table early-table">
+        <thead>
+          <tr>
+            {["월", "화", "수", "목", "금"].map((label) => (
+              <th key={label}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((week, weekIndex) => (
+            <tr key={`early-${weekIndex}`}>
+              {week.slice(0, 5).map((day, cellIndex) => (
+                <td key={`e-${cellIndex}`}>
+                  {day ? (
+                    <div className="early-cell">
+                      <span className="early-date">{day.day}/</span>
+                      {day.holidayName ? (
+                        <span className="early-holiday">{day.holidayName}</span>
+                      ) : (
+                        (earlyLeave[day.key] || []).map(([name, hours]) => (
+                          <span key={`${day.key}-${name}`}>
+                            {name}({hours})
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <table className="print-table legend-table">
+        <tbody>
+          <tr>
+            <th>표기법</th>
+            {printConfig.earlyLegend.map((item) => (
+              <td key={item.label}>{item.label}</td>
+            ))}
+          </tr>
+          <tr>
+            <th>퇴근시간</th>
+            {printConfig.earlyLegend.map((item) => (
+              <td key={item.label}>{item.time}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <p className="print-note">{printConfig.earlyNote}</p>
+
+      <table className="print-table viewers-table">
+        <tbody>
+          <tr>
+            <th className="viewers-label" rowSpan={2}>
+              공람
+            </th>
+            {printConfig.viewers.map((group) => (
+              <th key={group.group} colSpan={group.members.length}>
+                {group.group}
+              </th>
+            ))}
+          </tr>
+          <tr>
+            {printConfig.viewers.flatMap((group) =>
+              group.members.map((member, memberIndex) => (
+                <td key={`${group.group}-${memberIndex}`}>{member}</td>
+              )),
+            )}
+          </tr>
+          <tr className="viewers-sign">
+            <th>&nbsp;</th>
+            {printConfig.viewers.flatMap((group) =>
+              group.members.map((_, memberIndex) => (
+                <td key={`sign-${group.group}-${memberIndex}`} />
+              )),
+            )}
+          </tr>
+        </tbody>
+      </table>
+
+      <p className="print-footer">
+        <span>{printConfig.footerNote}</span>
+        <span>{printConfig.org}</span>
+      </p>
+    </div>
+  );
+}
+
 export default function Home() {
   const [activeView, setActiveView] = useState("duty");
   const days = getMonthDays();
   const firstDayOffset = new Date(Date.UTC(2026, 6, 1)).getUTCDay();
 
   return (
+    <>
     <div className="app-shell">
       <header className="topbar">
         <Image
@@ -257,24 +497,33 @@ export default function Home() {
       <main className="layout">
         <section className="calendar-panel" aria-label="월간 캘린더">
           <div className="calendar-toolbar">
-            <div className="calendar-tabs" role="tablist" aria-label="캘린더 종류">
-              {["duty", "events"].map((view) => {
-                const isActive = activeView === view;
+            <div className="toolbar-left">
+              <div className="calendar-tabs" role="tablist" aria-label="캘린더 종류">
+                {["duty", "events"].map((view) => {
+                  const isActive = activeView === view;
 
-                return (
-                  <button
-                    className={`tab-button${isActive ? " is-active" : ""}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    data-view={view}
-                    key={view}
-                    onClick={() => setActiveView(view)}
-                  >
-                    {view === "duty" ? "당직표" : "일정표"}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      className={`tab-button${isActive ? " is-active" : ""}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      data-view={view}
+                      key={view}
+                      onClick={() => setActiveView(view)}
+                    >
+                      {view === "duty" ? "당직표" : "일정표"}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                className="print-button"
+                type="button"
+                onClick={() => window.print()}
+              >
+                PDF 출력하기
+              </button>
             </div>
             <div className="legend" aria-label="범례" hidden={activeView !== "duty"}>
               {dutySlots.map((slot) => (
@@ -303,5 +552,7 @@ export default function Home() {
         </section>
       </main>
     </div>
+    <PrintSheet />
+    </>
   );
 }
