@@ -936,6 +936,18 @@ h2 {
   color: var(--muted);
 }
 
+.event-span.event-type-holiday {
+  border-color: var(--closed-line);
+  border-left-width: 1px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--closed-text);
+  cursor: default;
+}
+
+.event-span.event-type-holiday:hover {
+  filter: none;
+}
+
 .event-category-legend {
   display: none;
 }
@@ -1011,8 +1023,9 @@ h2 {
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.54);
   color: var(--closed-text);
-  font-size: 0.86rem;
+  font-size: 0.5rem;
   font-weight: 900;
+  line-height: 1.2;
   padding: 9px;
   text-align: center;
 }
@@ -1135,7 +1148,7 @@ h2 {
   }
 
   .closed-label {
-    font-size: 0.72rem;
+    font-size: 0.5rem;
     padding: 4px;
   }
 
@@ -1376,7 +1389,7 @@ h2 {
   .closed-label,
   .muted-label {
     border-radius: 5px;
-    font-size: 0.62rem;
+    font-size: 0.5rem;
     line-height: 1.2;
     padding: 3px;
   }

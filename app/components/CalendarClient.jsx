@@ -111,7 +111,11 @@ function buildEventVisibility(days, eventList) {
       visibleEventIds.add(event.id);
     }
 
-    const singleDayLimit = Math.max(MAX_VISIBLE_EVENTS_PER_DAY - multiDayEvents.length, 0);
+    const holidaySlotCount = day.holidayName ? 1 : 0;
+    const singleDayLimit = Math.max(
+      MAX_VISIBLE_EVENTS_PER_DAY - multiDayEvents.length - holidaySlotCount,
+      0,
+    );
     for (const event of singleDayEvents.slice(0, singleDayLimit)) {
       visibleEventIds.add(event.id);
     }
@@ -123,19 +127,34 @@ function buildEventVisibility(days, eventList) {
   return { visibleEventIds, hiddenEventCounts };
 }
 
-function buildEventSpans(eventList, monthStart, monthEnd, offset, visibleEventIds) {
+function buildEventSpans(days, eventList, monthStart, monthEnd, offset, visibleEventIds) {
   const spans = [];
   const rowLanes = new Map();
-  const visibleEvents = eventList
-    .filter((event) => visibleEventIds.has(event.id))
+  const holidayItems = days
+    .filter((day) => day.holidayName)
+    .map((day) => ({
+      id: `holiday-${day.key}`,
+      kind: "holiday",
+      type: "공휴일",
+      title: day.holidayName,
+      start_date: day.key,
+      end_date: day.key,
+    }));
+  const visibleItems = [
+    ...holidayItems,
+    ...eventList
+      .filter((event) => visibleEventIds.has(event.id))
+      .map((event) => ({ ...event, kind: "event" })),
+  ]
     .sort((a, b) => {
       const multiDaySort = Number(isMultiDayEvent(b)) - Number(isMultiDayEvent(a));
       if (multiDaySort !== 0) return multiDaySort;
       if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+      if (a.kind !== b.kind) return a.kind === "holiday" ? -1 : 1;
       return a.title.localeCompare(b.title, "ko");
     });
 
-  for (const event of visibleEvents) {
+  for (const event of visibleItems) {
     let segmentStart = parseDateKey(event.start_date < monthStart ? monthStart : event.start_date);
     const visibleEnd = parseDateKey(event.end_date > monthEnd ? monthEnd : event.end_date);
 
@@ -157,6 +176,7 @@ function buildEventSpans(eventList, monthStart, monthEnd, offset, visibleEventId
       spans.push({
         id: event.id,
         key: `${event.id}-${row}-${startCol}`,
+        kind: event.kind,
         type: event.type,
         title: event.title,
         row,
@@ -208,9 +228,7 @@ function DayCard({ activeView, day, hiddenEventCount = 0, onDayClick, onMoreClic
       </div>
       <div className="assignments">
         {activeView === "events" ? (
-          day.holidayName ? (
-            <div className="closed-label">{day.holidayName}</div>
-          ) : null
+          null
         ) : day.holidayName ? (
           <div className="closed-label">{day.holidayName}</div>
         ) : day.isWeekend ? (
@@ -223,9 +241,7 @@ function DayCard({ activeView, day, hiddenEventCount = 0, onDayClick, onMoreClic
             </div>
           ))
         ) : (
-          <div className="muted-label">
-            {activeView === "duty" ? "배정 없음" : "일정 없음"}
-          </div>
+          null
         )}
       </div>
     </article>
@@ -465,6 +481,7 @@ export default function CalendarClient({
   const monthEnd = `${month}-${String(days.length).padStart(2, "0")}`;
   const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, eventList);
   const eventSpans = buildEventSpans(
+    days,
     eventList,
     monthStart,
     monthEnd,
@@ -632,7 +649,22 @@ export default function CalendarClient({
                 );
               })}
               {activeView === "events"
-                ? eventSpans.map((event) => (
+                ? eventSpans.map((event) =>
+                    event.kind === "holiday" ? (
+                      <div
+                        className="event-span event-type-holiday"
+                        key={event.key}
+                        aria-label={`공휴일 ${event.title}`}
+                        style={{
+                          gridColumn: `${event.startCol} / ${event.endCol + 1}`,
+                          gridRow: event.row,
+                        }}
+                        data-lane={event.lane}
+                        title={event.title}
+                      >
+                        {event.title}
+                      </div>
+                    ) : (
                       <button
                         className={`event-span event-type-${TYPE_SLUG[event.type] || "etc"}`}
                         key={event.key}
@@ -651,7 +683,8 @@ export default function CalendarClient({
                       >
                         <EventLabel event={event} />
                       </button>
-                    ))
+                    ),
+                  )
                 : null}
             </div>
             {activeView === "events" ? <EventCategoryLegend /> : null}

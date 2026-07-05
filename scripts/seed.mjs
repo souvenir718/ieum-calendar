@@ -5,6 +5,7 @@
 //
 // 필요한 환경변수: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 import { createClient } from "@supabase/supabase-js";
+import { holidays } from "./holiday-data.mjs";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,8 +32,6 @@ const staff = [
   { name: "어영경", class_name: "도담반", role: "teacher", is_duty_eligible: true, sort_order: 6 },
   { name: "봉은영", class_name: "라온반", role: "teacher", is_duty_eligible: true, sort_order: 7 },
 ];
-
-const holidays = [{ holiday_date: "2026-07-17", name: "제헌절" }];
 
 const birthdayEvents = [
   { type: "생일", title: "어영경", start_date: "2027-01-16", end_date: "2027-01-16" },
