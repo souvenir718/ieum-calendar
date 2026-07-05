@@ -1,5 +1,5 @@
-const CACHE_NAME = "ieum-calendar-v3";
-const RUNTIME_CACHE = "ieum-calendar-runtime-v3";
+const CACHE_NAME = "ieum-calendar-v4";
+const RUNTIME_CACHE = "ieum-calendar-runtime-v4";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.ico",
@@ -48,6 +48,16 @@ self.addEventListener("fetch", (event) => {
   // Let the browser fetch them directly so a new deployment cannot be held back by
   // an older service worker runtime cache.
   if (url.pathname.startsWith("/_next/")) {
+    return;
+  }
+
+  // router.refresh() uses React Server Component requests for the current route.
+  // Those must not be served from the runtime cache after event mutations.
+  if (
+    url.searchParams.has("_rsc") ||
+    request.headers.has("RSC") ||
+    request.headers.has("Next-Router-State-Tree")
+  ) {
     return;
   }
 

@@ -24,5 +24,9 @@ export async function POST(request) {
   if (dbError) return Response.json({ error: dbError.message }, { status: 500 });
 
   revalidatePath("/[month]", "page");
+  revalidatePath(`/${value.start_date.slice(0, 7)}`);
+  if (value.end_date.slice(0, 7) !== value.start_date.slice(0, 7)) {
+    revalidatePath(`/${value.end_date.slice(0, 7)}`);
+  }
   return Response.json({ event: data });
 }
