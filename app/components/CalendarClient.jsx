@@ -13,7 +13,7 @@ import {
   getMonthDays,
   weekdayLabels,
 } from "../../lib/calendar";
-import { EVENT_TYPE_ICON, TYPE_SLUG } from "../../lib/events";
+import { EVENT_TYPE_ICON, EVENT_TYPES, TYPE_SLUG } from "../../lib/events";
 import { dutySlots, printConfig } from "../../lib/print-config";
 import EventModal from "./EventModal";
 
@@ -48,8 +48,37 @@ function calendarPosition(offset, day) {
   };
 }
 
-function eventLabel(event) {
+function eventMobileLabel(event) {
   return `${EVENT_TYPE_ICON[event.type] || "📌"} ${event.title}`;
+}
+
+function eventDesktopLabel(event) {
+  return `[${EVENT_TYPE_ICON[event.type] || "📌"} ${event.type}] ${event.title}`;
+}
+
+function EventLabel({ event }) {
+  return (
+    <>
+      <span className="event-label-mobile">{eventMobileLabel(event)}</span>
+      <span className="event-label-desktop">{eventDesktopLabel(event)}</span>
+    </>
+  );
+}
+
+function EventCategoryLegend() {
+  return (
+    <div className="event-category-legend" aria-label="일정 카테고리 설명">
+      {EVENT_TYPES.map((type) => (
+        <span
+          className={`event-category-item event-type-${TYPE_SLUG[type] || "etc"}`}
+          key={type}
+        >
+          <span aria-hidden="true">{EVENT_TYPE_ICON[type] || "📌"}</span>
+          <strong>{type}</strong>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function eventAriaLabel(event) {
@@ -130,7 +159,6 @@ function buildEventSpans(eventList, monthStart, monthEnd, offset, visibleEventId
         key: `${event.id}-${row}-${startCol}`,
         type: event.type,
         title: event.title,
-        label: eventLabel(event),
         row,
         startCol,
         endCol,
@@ -228,7 +256,7 @@ function DayEventsModal({ day, onClose, onEventClick }) {
               aria-label={eventAriaLabel(event)}
               onClick={() => onEventClick(event)}
             >
-              {eventLabel(event)}
+              <EventLabel event={event} />
             </button>
           ))}
         </div>
@@ -621,11 +649,12 @@ export default function CalendarClient({
                         }}
                         title="클릭해서 수정"
                       >
-                        {event.label}
+                        <EventLabel event={event} />
                       </button>
                     ))
                 : null}
             </div>
+            {activeView === "events" ? <EventCategoryLegend /> : null}
           </section>
         </main>
       </div>
