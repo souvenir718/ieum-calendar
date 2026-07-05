@@ -1,3 +1,5 @@
+import { Analytics } from "@vercel/analytics/next";
+
 import "./globals.css";
 import ServiceWorkerRegister from "./service-worker-register";
 
@@ -17,6 +19,8 @@ export const metadata = {
 };
 
 export const viewport = {
+  width: "device-width",
+  initialScale: 1,
   themeColor: "#fff8ef",
 };
 
@@ -26,6 +30,7 @@ export default function RootLayout({ children }) {
       <body>
         <ServiceWorkerRegister />
         {children}
+        <Analytics />
       </body>
     </html>
   );

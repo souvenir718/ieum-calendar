@@ -1,5 +1,5 @@
-const CACHE_NAME = "ieum-calendar-v2";
-const RUNTIME_CACHE = "ieum-calendar-runtime-v2";
+const CACHE_NAME = "ieum-calendar-v3";
+const RUNTIME_CACHE = "ieum-calendar-runtime-v3";
 const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/favicon.ico",
@@ -41,6 +41,13 @@ self.addEventListener("fetch", (event) => {
 
   // API 라우트는 항상 네트워크에서 가져온다(편집 반영/인증 stale 방지).
   if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  // Next.js build assets are content-hashed and already cache-controlled by Vercel.
+  // Let the browser fetch them directly so a new deployment cannot be held back by
+  // an older service worker runtime cache.
+  if (url.pathname.startsWith("/_next/")) {
     return;
   }
 
