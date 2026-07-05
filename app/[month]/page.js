@@ -43,9 +43,10 @@ export default async function MonthPage({ params }) {
       .lte("holiday_date", holidayWindowEnd),
     supabase
       .from("events")
-      .select("id, type, title, start_date, end_date, staff:staff_id(name)")
+      .select("id, type, title, start_date, end_date")
       .lte("start_date", monthEnd)
-      .gte("end_date", monthStart),
+      .gte("end_date", monthStart)
+      .order("start_date"),
   ]);
 
   for (const res of [dutiesRes, holidaysRes, eventsRes]) {
@@ -76,10 +77,18 @@ export default async function MonthPage({ params }) {
     for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
       const key = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
       if (key < monthStart || key > monthEnd) continue;
-      const label = row.staff?.name ? `${row.title} (${row.staff.name})` : row.title;
-      (events[key] ||= []).push(label);
+      (events[key] ||= []).push({ id: row.id, title: row.title, type: row.type });
     }
   }
+
+  // 편집용 원본 일정 목록 (id 포함, 직렬화 가능한 형태)
+  const eventList = (eventsRes.data ?? []).map((row) => ({
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    start_date: row.start_date,
+    end_date: row.end_date,
+  }));
 
   return (
     <CalendarClient
@@ -92,6 +101,7 @@ export default async function MonthPage({ params }) {
       assignments={assignments}
       holidays={holidays}
       events={events}
+      eventList={eventList}
     />
   );
 }

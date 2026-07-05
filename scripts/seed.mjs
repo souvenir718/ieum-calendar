@@ -34,6 +34,18 @@ const staff = [
 
 const holidays = [{ holiday_date: "2026-07-17", name: "제헌절" }];
 
+const birthdayEvents = [
+  { type: "생일", title: "어영경", start_date: "2027-01-16", end_date: "2027-01-16" },
+  { type: "생일", title: "최옥희", start_date: "2026-03-05", end_date: "2026-03-05" },
+  { type: "생일", title: "홍여진", start_date: "2026-04-09", end_date: "2026-04-09" },
+  { type: "생일", title: "봉은영", start_date: "2026-04-16", end_date: "2026-04-16" },
+  { type: "생일", title: "진복남", start_date: "2026-07-20", end_date: "2026-07-20" },
+  { type: "생일", title: "이혜빈", start_date: "2026-08-21", end_date: "2026-08-21" },
+  { type: "생일", title: "김민경", start_date: "2026-10-05", end_date: "2026-10-05" },
+  { type: "생일", title: "정지혜", start_date: "2026-12-09", end_date: "2026-12-09" },
+  { type: "생일", title: "김윤경", start_date: "2026-12-20", end_date: "2026-12-20" },
+];
+
 // ── 당직 (현재 2026년 7월 표) ────────────────────────────
 const assignments = {
   "2026-07-02": [["오전1", "김민경"], ["오전2", "정지혜"], ["오후1", "이혜빈"], ["오후2", "최옥희"]],
@@ -104,8 +116,29 @@ async function main() {
     die("duties upsert", error);
   }
 
+  // 4) birthdays insert if missing
+  const { data: existingBirthdays, error: birthdaySelErr } = await supabase
+    .from("events")
+    .select("type, title, start_date, end_date")
+    .eq("type", "생일")
+    .gte("start_date", "2026-01-01")
+    .lte("start_date", "2027-12-31");
+  die("birthday select", birthdaySelErr);
+
+  const birthdayKey = (event) =>
+    `${event.type}:${event.title}:${event.start_date}:${event.end_date}`;
+  const existingBirthdayKeys = new Set((existingBirthdays ?? []).map(birthdayKey));
+  const birthdayRows = birthdayEvents.filter((event) => !existingBirthdayKeys.has(birthdayKey(event)));
+
+  if (birthdayRows.length > 0) {
+    const { error } = await supabase.from("events").insert(birthdayRows);
+    die("birthday insert", error);
+  }
+
   console.log("✓ 시드 완료");
-  console.log(`  staff: ${staff.length}명, holidays: ${holidays.length}건, duties: ${dutyRows.length}건`);
+  console.log(
+    `  staff: ${staff.length}명, holidays: ${holidays.length}건, duties: ${dutyRows.length}건, birthdays: ${birthdayRows.length}/${birthdayEvents.length}건 추가`,
+  );
 }
 
 main().catch((e) => {

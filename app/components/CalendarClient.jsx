@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import {
   deriveEarlyLeave,
@@ -13,35 +13,185 @@ import {
   getMonthDays,
   weekdayLabels,
 } from "../../lib/calendar";
+import { EVENT_TYPE_ICON, TYPE_SLUG } from "../../lib/events";
 import { dutySlots, printConfig } from "../../lib/print-config";
+import EventModal from "./EventModal";
 
-function DayCard({ activeView, day }) {
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MAX_VISIBLE_EVENTS_PER_DAY = 4;
+const VIEW_STORAGE_KEY = "ieum-calendar-active-view";
+function parseDateKey(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function toDateKey(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+  return new Date(date.getTime() + days * MS_PER_DAY);
+}
+
+function dayNumberFromKey(key) {
+  return Number(key.slice(-2));
+}
+
+function calendarPosition(offset, day) {
+  const index = offset + day - 1;
+  return {
+    row: Math.floor(index / 7) + 1,
+    col: (index % 7) + 1,
+  };
+}
+
+function eventLabel(event) {
+  return `${EVENT_TYPE_ICON[event.type] || "📌"} ${event.title}`;
+}
+
+function eventAriaLabel(event) {
+  return `${event.type} ${event.title}`;
+}
+
+function isMultiDayEvent(event) {
+  return event.start_date !== event.end_date;
+}
+
+function buildEventVisibility(days, eventList) {
+  const eventById = new Map(eventList.map((event) => [event.id, event]));
+  const visibleEventIds = new Set();
+  const hiddenEventCounts = {};
+
+  for (const day of days) {
+    const multiDayEvents = [];
+    const singleDayEvents = [];
+
+    for (const event of day.events) {
+      const fullEvent = eventById.get(event.id);
+      if (fullEvent && isMultiDayEvent(fullEvent)) {
+        multiDayEvents.push(event);
+      } else {
+        singleDayEvents.push(event);
+      }
+    }
+
+    for (const event of multiDayEvents) {
+      visibleEventIds.add(event.id);
+    }
+
+    const singleDayLimit = Math.max(MAX_VISIBLE_EVENTS_PER_DAY - multiDayEvents.length, 0);
+    for (const event of singleDayEvents.slice(0, singleDayLimit)) {
+      visibleEventIds.add(event.id);
+    }
+
+    const hiddenCount = Math.max(singleDayEvents.length - singleDayLimit, 0);
+    if (hiddenCount > 0) hiddenEventCounts[day.key] = hiddenCount;
+  }
+
+  return { visibleEventIds, hiddenEventCounts };
+}
+
+function buildEventSpans(eventList, monthStart, monthEnd, offset, visibleEventIds) {
+  const spans = [];
+  const rowLanes = new Map();
+  const visibleEvents = eventList
+    .filter((event) => visibleEventIds.has(event.id))
+    .sort((a, b) => {
+      const multiDaySort = Number(isMultiDayEvent(b)) - Number(isMultiDayEvent(a));
+      if (multiDaySort !== 0) return multiDaySort;
+      if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+      return a.title.localeCompare(b.title, "ko");
+    });
+
+  for (const event of visibleEvents) {
+    let segmentStart = parseDateKey(event.start_date < monthStart ? monthStart : event.start_date);
+    const visibleEnd = parseDateKey(event.end_date > monthEnd ? monthEnd : event.end_date);
+
+    while (segmentStart <= visibleEnd) {
+      const startDay = dayNumberFromKey(toDateKey(segmentStart));
+      const { row, col: startCol } = calendarPosition(offset, startDay);
+      const daysLeftInWeek = 7 - startCol;
+      const segmentEnd = new Date(
+        Math.min(addDays(segmentStart, daysLeftInWeek).getTime(), visibleEnd.getTime()),
+      );
+      const endDay = dayNumberFromKey(toDateKey(segmentEnd));
+      const { col: endCol } = calendarPosition(offset, endDay);
+      const lanes = rowLanes.get(row) || [];
+      const lane = lanes.findIndex((lastEndCol) => lastEndCol < startCol);
+      const assignedLane = lane === -1 ? lanes.length : lane;
+      lanes[assignedLane] = endCol;
+      rowLanes.set(row, lanes);
+
+      spans.push({
+        id: event.id,
+        key: `${event.id}-${row}-${startCol}`,
+        type: event.type,
+        title: event.title,
+        label: eventLabel(event),
+        row,
+        startCol,
+        endCol,
+        lane: assignedLane,
+      });
+
+      segmentStart = addDays(segmentEnd, 1);
+    }
+  }
+
+  return spans;
+}
+
+function DayCard({ activeView, day, hiddenEventCount = 0, onDayClick, onMoreClick, style }) {
   const classes = ["day-card"];
   if (day.isWeekend) classes.push("is-weekend");
   if (day.holidayName) classes.push("is-holiday");
+  const clickable = activeView === "events";
+  if (clickable) classes.push("is-clickable");
+  const hasEvents = day.events.length > 0;
 
   return (
-    <article className={classes.join(" ")}>
+    <article
+      className={classes.join(" ")}
+      onClick={clickable ? () => onDayClick?.(day.key) : undefined}
+      style={style}
+      title={clickable ? "클릭해서 이 날짜에 일정 추가" : undefined}
+    >
       <div className="date-row">
         <span className="date-number">{day.day}</span>
-        <span className="weekday-label">{day.weekday}</span>
+        {activeView === "events" && hiddenEventCount > 0 ? (
+          <button
+            className="event-more-button"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoreClick?.(day);
+            }}
+          >
+            +{hiddenEventCount}개
+          </button>
+        ) : activeView === "events" && hasEvents ? (
+          <span className="event-count">{day.events.length}개</span>
+        ) : (
+          <span className="weekday-label">{day.weekday}</span>
+        )}
       </div>
       <div className="assignments">
-        {day.holidayName ? (
+        {activeView === "events" ? (
+          day.holidayName ? (
+            <div className="closed-label">{day.holidayName}</div>
+          ) : null
+        ) : day.holidayName ? (
           <div className="closed-label">{day.holidayName}</div>
         ) : day.isWeekend ? (
-          <div className="muted-label">주말</div>
+          null
         ) : activeView === "duty" && day.assignments.length > 0 ? (
           day.assignments.map(([slot, person]) => (
             <div className="assignment" data-slot={slot} key={`${day.key}-${slot}`}>
               <span className="slot">{slot}</span>
               <span className="assignee">{person}</span>
-            </div>
-          ))
-        ) : activeView === "events" && day.events.length > 0 ? (
-          day.events.map((event, index) => (
-            <div className="event-item" key={`${day.key}-${index}`}>
-              {event}
             </div>
           ))
         ) : (
@@ -51,6 +201,44 @@ function DayCard({ activeView, day }) {
         )}
       </div>
     </article>
+  );
+}
+
+function DayEventsModal({ day, onClose, onEventClick }) {
+  if (!day) return null;
+
+  return (
+    <div className="modal-overlay" role="presentation" onClick={onClose}>
+      <div
+        className="modal day-events-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="day-events-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 id="day-events-title">
+          {day.day}일 {day.weekday}요일 일정
+        </h4>
+        <div className="day-events-list">
+          {day.events.map((event) => (
+            <button
+              className={`day-event-row event-type-${TYPE_SLUG[event.type] || "etc"}`}
+              key={event.id}
+              type="button"
+              aria-label={eventAriaLabel(event)}
+              onClick={() => onEventClick(event)}
+            >
+              {eventLabel(event)}
+            </button>
+          ))}
+        </div>
+        <div className="modal-actions">
+          <button type="button" onClick={onClose}>
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -227,14 +415,61 @@ export default function CalendarClient({
   assignments,
   holidays,
   events,
+  eventList = [],
 }) {
   const [activeView, setActiveView] = useState("duty");
+  const [modal, setModal] = useState(null);
+  const [dayEventsModal, setDayEventsModal] = useState(null);
+
+  useEffect(() => {
+    const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (savedView === "duty" || savedView === "events") {
+      setActiveView(savedView);
+    }
+  }, []);
 
   const days = getMonthDays(year, monthIndex, { holidays, assignments, events });
   const weeks = getDutyWeeks(days);
   const earlyLeave = deriveEarlyLeave(assignments, holidays);
   const offset = firstDayOffset(year, monthIndex);
   const printTitle = `${displayMonth} 당직 및 조기퇴근`;
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(days.length).padStart(2, "0")}`;
+  const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, eventList);
+  const eventSpans = buildEventSpans(
+    eventList,
+    monthStart,
+    monthEnd,
+    offset,
+    visibleEventIds,
+  );
+
+  const openAdd = (date) => {
+    const d = date || `${month}-01`;
+    setModal({ type: "행사", title: "", start_date: d, end_date: d });
+  };
+  const openEdit = (ev) => {
+    const full = eventList.find((e) => e.id === ev.id);
+    if (!full) return;
+    setModal({
+      id: full.id,
+      type: full.type,
+      title: full.title,
+      start_date: full.start_date,
+      end_date: full.end_date,
+    });
+  };
+  const openEditFromDayModal = (ev) => {
+    setDayEventsModal(null);
+    openEdit(ev);
+  };
+  const changeView = (view) => {
+    setActiveView(view);
+    window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+  };
+  const persistCurrentView = () => {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, activeView);
+  };
 
   return (
     <>
@@ -249,7 +484,13 @@ export default function CalendarClient({
             priority
           />
           <nav className="month-switch" aria-label="월 이동">
-            <Link className="month-switch-arrow" href={`/${prevMonth}`} aria-label="이전 달" prefetch={false}>
+            <Link
+              className="month-switch-arrow"
+              href={`/${prevMonth}`}
+              aria-label="이전 달"
+              prefetch={false}
+              onClick={persistCurrentView}
+            >
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path
                   d="M15 5l-7 7 7 7"
@@ -265,7 +506,13 @@ export default function CalendarClient({
               <small>{year}년</small>
               <strong>{monthIndex + 1}월</strong>
             </span>
-            <Link className="month-switch-arrow" href={`/${nextMonth}`} aria-label="다음 달" prefetch={false}>
+            <Link
+              className="month-switch-arrow"
+              href={`/${nextMonth}`}
+              aria-label="다음 달"
+              prefetch={false}
+              onClick={persistCurrentView}
+            >
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path
                   d="M9 5l7 7-7 7"
@@ -296,7 +543,7 @@ export default function CalendarClient({
                         aria-selected={isActive}
                         data-view={view}
                         key={view}
-                        onClick={() => setActiveView(view)}
+                        onClick={() => changeView(view)}
                       >
                         {view === "duty" ? "당직표" : "일정표"}
                       </button>
@@ -322,7 +569,11 @@ export default function CalendarClient({
                     </span>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <button className="event-add-btn" type="button" onClick={() => openAdd()}>
+                  ＋ 일정 추가
+                </button>
+              )}
             </div>
             <div className="weekdays" aria-hidden="true">
               {weekdayLabels.map((weekday) => (
@@ -331,15 +582,65 @@ export default function CalendarClient({
             </div>
             <div className="calendar-grid">
               {Array.from({ length: offset }, (_, index) => (
-                <div className="day-card is-empty" key={`empty-${index}`} />
+                <div
+                  className="day-card is-empty"
+                  key={`empty-${index}`}
+                  style={{ gridColumn: index + 1, gridRow: 1 }}
+                />
               ))}
-              {days.map((day) => (
-                <DayCard activeView={activeView} day={day} key={day.key} />
-              ))}
+              {days.map((day) => {
+                const { row, col } = calendarPosition(offset, day.day);
+
+                return (
+                  <DayCard
+                    activeView={activeView}
+                    day={day}
+                    hiddenEventCount={hiddenEventCounts[day.key] || 0}
+                    key={day.key}
+                    onDayClick={openAdd}
+                    onMoreClick={setDayEventsModal}
+                    style={{ gridColumn: col, gridRow: row }}
+                  />
+                );
+              })}
+              {activeView === "events"
+                ? eventSpans.map((event) => (
+                      <button
+                        className={`event-span event-type-${TYPE_SLUG[event.type] || "etc"}`}
+                        key={event.key}
+                        type="button"
+                        aria-label={eventAriaLabel(event)}
+                        style={{
+                          gridColumn: `${event.startCol} / ${event.endCol + 1}`,
+                          gridRow: event.row,
+                        }}
+                        data-lane={event.lane}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(event);
+                        }}
+                        title="클릭해서 수정"
+                      >
+                        {event.label}
+                      </button>
+                    ))
+                : null}
             </div>
           </section>
         </main>
       </div>
+
+      {modal ? (
+        <EventModal initial={modal} onClose={() => setModal(null)} />
+      ) : null}
+      {dayEventsModal ? (
+        <DayEventsModal
+          day={dayEventsModal}
+          onClose={() => setDayEventsModal(null)}
+          onEventClick={openEditFromDayModal}
+        />
+      ) : null}
+
       <PrintSheet weeks={weeks} earlyLeave={earlyLeave} title={printTitle} />
     </>
   );
