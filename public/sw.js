@@ -1,7 +1,6 @@
-const CACHE_NAME = "ieum-calendar-v1";
-const RUNTIME_CACHE = "ieum-calendar-runtime-v1";
+const CACHE_NAME = "ieum-calendar-v2";
+const RUNTIME_CACHE = "ieum-calendar-runtime-v2";
 const PRECACHE_URLS = [
-  "/",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/apple-touch-icon.png",
@@ -40,6 +39,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // API 라우트는 항상 네트워크에서 가져온다(편집 반영/인증 stale 방지).
+  if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -50,7 +54,7 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(async () => {
           const cached = await caches.match(request);
-          return cached || caches.match("/");
+          return cached || Response.error();
         }),
     );
     return;
