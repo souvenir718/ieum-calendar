@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { EVENT_TYPE_ICON, EVENT_TYPES } from "../../lib/events";
 
 // initial: { id?, type, title, start_date, end_date }
-export default function EventModal({ initial, onClose }) {
+export default function EventModal({ initial, onClose, onDeleted, onSaved }) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -36,6 +36,9 @@ export default function EventModal({ initial, onClose }) {
         setBusy(false);
         return;
       }
+      if (data.event) {
+        onSaved?.(data.event);
+      }
       onClose();
       router.refresh();
     } catch {
@@ -55,6 +58,7 @@ export default function EventModal({ initial, onClose }) {
         setBusy(false);
         return;
       }
+      onDeleted?.(form.id);
       onClose();
       router.refresh();
     } catch {

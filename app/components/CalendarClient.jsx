@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
   deriveEarlyLeave,
@@ -87,6 +87,40 @@ function eventAriaLabel(event) {
 
 function isMultiDayEvent(event) {
   return event.start_date !== event.end_date;
+}
+
+function buildEventsByDay(eventList, monthStart, monthEnd) {
+  const events = {};
+
+  for (const row of eventList) {
+    const start = parseDateKey(row.start_date);
+    const end = parseDateKey(row.end_date);
+    for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+      const key = toDateKey(d);
+      if (key < monthStart || key > monthEnd) continue;
+      (events[key] ||= []).push({ id: row.id, title: row.title, type: row.type });
+    }
+  }
+
+  for (const list of Object.values(events)) {
+    list.sort((a, b) => {
+      const fullA = eventList.find((event) => event.id === a.id);
+      const fullB = eventList.find((event) => event.id === b.id);
+      const multiDaySort =
+        Number(fullB && isMultiDayEvent(fullB)) - Number(fullA && isMultiDayEvent(fullA));
+      if (multiDaySort !== 0) return multiDaySort;
+      return a.title.localeCompare(b.title, "ko");
+    });
+  }
+
+  return events;
+}
+
+function sortEvents(eventList) {
+  return [...eventList].sort((a, b) => {
+    if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+    return a.title.localeCompare(b.title, "ko");
+  });
 }
 
 function buildEventVisibility(days, eventList) {
@@ -458,12 +492,12 @@ export default function CalendarClient({
   nextMonth,
   assignments,
   holidays,
-  events,
   eventList = [],
 }) {
   const [activeView, setActiveView] = useState("duty");
   const [modal, setModal] = useState(null);
   const [dayEventsModal, setDayEventsModal] = useState(null);
+  const [localEventList, setLocalEventList] = useState(() => sortEvents(eventList));
 
   useEffect(() => {
     const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
@@ -472,17 +506,29 @@ export default function CalendarClient({
     }
   }, []);
 
-  const days = getMonthDays(year, monthIndex, { holidays, assignments, events });
+  useEffect(() => {
+    setLocalEventList(sortEvents(eventList));
+  }, [eventList]);
+
+  const monthStart = `${month}-01`;
+  const monthEnd = toDateKey(new Date(Date.UTC(year, monthIndex + 1, 0)));
+  const localEvents = useMemo(
+    () => buildEventsByDay(localEventList, monthStart, monthEnd),
+    [localEventList, monthStart, monthEnd],
+  );
+  const days = getMonthDays(year, monthIndex, {
+    holidays,
+    assignments,
+    events: localEvents,
+  });
   const weeks = getDutyWeeks(days);
   const earlyLeave = deriveEarlyLeave(assignments, holidays);
   const offset = firstDayOffset(year, monthIndex);
   const printTitle = `${displayMonth} 당직 및 조기퇴근`;
-  const monthStart = `${month}-01`;
-  const monthEnd = `${month}-${String(days.length).padStart(2, "0")}`;
-  const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, eventList);
+  const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, localEventList);
   const eventSpans = buildEventSpans(
     days,
-    eventList,
+    localEventList,
     monthStart,
     monthEnd,
     offset,
@@ -494,7 +540,7 @@ export default function CalendarClient({
     setModal({ type: "행사", title: "", start_date: d, end_date: d });
   };
   const openEdit = (ev) => {
-    const full = eventList.find((e) => e.id === ev.id);
+    const full = localEventList.find((e) => e.id === ev.id);
     if (!full) return;
     setModal({
       id: full.id,
@@ -514,6 +560,16 @@ export default function CalendarClient({
   };
   const persistCurrentView = () => {
     window.localStorage.setItem(VIEW_STORAGE_KEY, activeView);
+  };
+  const upsertLocalEvent = (event) => {
+    setLocalEventList((current) =>
+      sortEvents([...current.filter((item) => item.id !== event.id), event]),
+    );
+    setDayEventsModal(null);
+  };
+  const removeLocalEvent = (id) => {
+    setLocalEventList((current) => current.filter((event) => event.id !== id));
+    setDayEventsModal(null);
   };
 
   return (
@@ -693,7 +749,12 @@ export default function CalendarClient({
       </div>
 
       {modal ? (
-        <EventModal initial={modal} onClose={() => setModal(null)} />
+        <EventModal
+          initial={modal}
+          onClose={() => setModal(null)}
+          onDeleted={removeLocalEvent}
+          onSaved={upsertLocalEvent}
+        />
       ) : null}
       {dayEventsModal ? (
         <DayEventsModal
