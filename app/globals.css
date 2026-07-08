@@ -1040,19 +1040,21 @@ h2 {
 @media (min-width: 721px) {
   html,
   body {
-    min-height: 100%;
+    height: 100%;
+    overflow: hidden;
   }
 
   .app-shell {
     display: grid;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto minmax(0, 1fr);
     width: min(1184px, calc(100% - 56px));
-    min-height: 100vh;
-    padding: 16px 0 28px;
+    height: 100dvh;
+    min-height: 0;
+    padding: 8px 0 10px;
   }
 
   .topbar {
-    margin-bottom: 14px;
+    margin-bottom: 8px;
   }
 
   .brand-logo {
@@ -1074,16 +1076,18 @@ h2 {
   }
 
   .layout {
+    display: grid;
     min-height: 0;
   }
 
   .calendar-panel {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
+    min-height: 0;
   }
 
   .calendar-toolbar {
-    padding: 10px 14px;
+    padding: 8px 14px;
   }
 
   .tab-button {
@@ -1109,11 +1113,12 @@ h2 {
   .calendar-grid {
     min-height: 0;
     height: 100%;
-    grid-auto-rows: minmax(124px, auto);
+    grid-auto-rows: minmax(0, 1fr);
   }
 
   .day-card {
-    min-height: 124px;
+    min-height: 0;
+    overflow: hidden;
     padding: 5px;
   }
 
@@ -1158,6 +1163,12 @@ h2 {
 }
 
 @media (max-width: 720px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     background: var(--bg);
   }
@@ -1167,14 +1178,18 @@ h2 {
   }
 
   .app-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     width: min(100% - 12px, 1480px);
-    padding: 14px 0 16px;
+    height: 100dvh;
+    min-height: 0;
+    padding: 6px 0 8px;
   }
 
   .topbar {
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 6px;
     min-width: 0;
   }
 
@@ -1182,7 +1197,7 @@ h2 {
     flex: 1 1 auto;
     min-width: 0;
     width: min(210px, calc(100vw - 184px));
-    max-height: 72px;
+    max-height: 52px;
   }
 
   .month-switch {
@@ -1217,33 +1232,41 @@ h2 {
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
-    padding: 14px;
+    gap: 6px;
+    padding: 8px;
   }
 
   .calendar-panel {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    min-height: 0;
     box-shadow: none;
+  }
+
+  .layout {
+    display: grid;
+    min-height: 0;
   }
 
   .tab-button {
     min-width: 70px;
-    min-height: 28px;
-    padding: 7px 12px;
+    min-height: 26px;
+    padding: 6px 10px;
   }
 
   .legend {
     align-items: center;
     justify-content: flex-start;
     width: 100%;
-    gap: 6px;
-    font-size: 0.76rem;
+    gap: 4px;
+    font-size: 0.68rem;
   }
 
   .legend span {
     justify-content: center;
     flex: 1 1 calc(50% - 6px);
-    min-height: 30px;
-    padding: 5px 6px;
+    min-height: 24px;
+    padding: 3px 5px;
   }
 
   .legend small {
@@ -1255,19 +1278,23 @@ h2 {
   }
 
   .weekdays span {
-    padding: 7px 2px;
+    padding: 5px 2px;
     font-size: 0.68rem;
   }
 
   .calendar-grid {
     grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-height: 0;
+    height: 100%;
+    grid-auto-rows: minmax(0, 1fr);
     --event-stack-top: 24px;
     --event-row-height: 18px;
   }
 
   .day-card {
-    min-height: 100px;
-    padding: 5px;
+    min-height: 0;
+    overflow: hidden;
+    padding: 4px;
     border-right: 1px solid var(--line);
   }
 
@@ -1277,7 +1304,7 @@ h2 {
 
   .date-row {
     gap: 3px;
-    margin-bottom: 5px;
+    margin-bottom: 3px;
   }
 
   .date-number {
@@ -1289,7 +1316,7 @@ h2 {
   }
 
   .assignments {
-    gap: 3px;
+    gap: 2px;
   }
 
   .assignment,

@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import {
   deriveEarlyLeave,
@@ -30,6 +31,9 @@ import {
   buildEventSpans,
 } from "./calendarUtils";
 
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /**
  * 캘린더 전체 레이아웃과 상태 관리를 담당하는 메인 컴포넌트입니다.
  */
@@ -44,21 +48,27 @@ export default function CalendarClient({
   holidays,
   eventList = [],
 }) {
+  const router = useRouter();
   const [activeView, setActiveView] = useState("duty");
   const [modal, setModal] = useState(null);
   const [dayEventsModal, setDayEventsModal] = useState(null);
   const [localEventList, setLocalEventList] = useState(() => sortEvents(eventList));
 
-  useEffect(() => {
+  useClientLayoutEffect(() => {
     const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
     if (savedView === "duty" || savedView === "events") {
       setActiveView(savedView);
     }
-  }, []);
+  }, [month]);
 
   useEffect(() => {
     setLocalEventList(sortEvents(eventList));
   }, [eventList]);
+
+  useEffect(() => {
+    router.prefetch(`/${prevMonth}`);
+    router.prefetch(`/${nextMonth}`);
+  }, [nextMonth, prevMonth, router]);
 
   const monthStart = `${month}-01`;
   const monthEnd = toDateKey(new Date(Date.UTC(year, monthIndex + 1, 0)));
@@ -74,6 +84,7 @@ export default function CalendarClient({
   const weeks = getDutyWeeks(days);
   const earlyLeave = deriveEarlyLeave(assignments, holidays);
   const offset = firstDayOffset(year, monthIndex);
+  const trailingEmptyCount = Math.max(0, 42 - offset - days.length);
   const printTitle = `${displayMonth} 당직 및 조기퇴근`;
   const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, localEventList);
   const eventSpans = buildEventSpans(
@@ -139,7 +150,6 @@ export default function CalendarClient({
               className="month-switch-arrow"
               href={`/${prevMonth}`}
               aria-label="이전 달"
-              prefetch={false}
               onClick={persistCurrentView}
             >
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -161,7 +171,6 @@ export default function CalendarClient({
               className="month-switch-arrow"
               href={`/${nextMonth}`}
               aria-label="다음 달"
-              prefetch={false}
               onClick={persistCurrentView}
             >
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -250,6 +259,19 @@ export default function CalendarClient({
                     key={day.key}
                     onDayClick={openAdd}
                     onMoreClick={setDayEventsModal}
+                    style={{ gridColumn: col, gridRow: row }}
+                  />
+                );
+              })}
+              {Array.from({ length: trailingEmptyCount }, (_, index) => {
+                const position = offset + days.length + index;
+                const row = Math.floor(position / 7) + 1;
+                const col = (position % 7) + 1;
+
+                return (
+                  <div
+                    className="day-card is-empty"
+                    key={`trailing-empty-${index}`}
                     style={{ gridColumn: col, gridRow: row }}
                   />
                 );
