@@ -12,8 +12,9 @@ import {
 } from "../../lib/calendar";
 import CalendarClient from "../components/CalendarClient";
 
-// 항상 최신 DB 상태를 반영 (편집 후 즉시 표시)
-export const dynamic = "force-dynamic";
+// 월 페이지는 ISR 캐시를 사용하고, 일정 변경 API에서 revalidatePath로 갱신한다.
+export const dynamic = "force-static";
+export const revalidate = 60;
 
 export default async function MonthPage({ params }) {
   const { month } = await params;
