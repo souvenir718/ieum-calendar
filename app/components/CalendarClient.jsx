@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   deriveEarlyLeave,
@@ -34,6 +34,9 @@ import {
 const useClientLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
+const LOGO_EASTER_EGG_CLICKS = 5;
+const LOGO_EASTER_EGG_WINDOW_MS = 1500;
+
 /**
  * 캘린더 전체 레이아웃과 상태 관리를 담당하는 메인 컴포넌트입니다.
  */
@@ -49,6 +52,8 @@ export default function CalendarClient({
   eventList = [],
 }) {
   const router = useRouter();
+  const logoClickCountRef = useRef(0);
+  const logoClickTimerRef = useRef(null);
   const [activeView, setActiveView] = useState("duty");
   const [modal, setModal] = useState(null);
   const [dayEventsModal, setDayEventsModal] = useState(null);
@@ -132,6 +137,18 @@ export default function CalendarClient({
     setLocalEventList((current) => current.filter((event) => event.id !== id));
     setDayEventsModal(null);
   };
+  const handleLogoClick = () => {
+    logoClickCountRef.current += 1;
+    clearTimeout(logoClickTimerRef.current);
+    if (logoClickCountRef.current >= LOGO_EASTER_EGG_CLICKS) {
+      logoClickCountRef.current = 0;
+      router.push("/stats");
+      return;
+    }
+    logoClickTimerRef.current = setTimeout(() => {
+      logoClickCountRef.current = 0;
+    }, LOGO_EASTER_EGG_WINDOW_MS);
+  };
 
   return (
     <>
@@ -144,6 +161,7 @@ export default function CalendarClient({
             width={1254}
             height={444}
             priority
+            onClick={handleLogoClick}
           />
           <nav className="month-switch" aria-label="월 이동">
             <Link
