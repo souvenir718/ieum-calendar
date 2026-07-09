@@ -5,10 +5,16 @@ import { useRouter } from "next/navigation";
 
 import { EVENT_TYPE_ICON, EVENT_TYPES } from "../../lib/events";
 
+function formatDateRange(start, end) {
+  if (!end || end === start) return start;
+  return `${start} ~ ${end}`;
+}
+
 // initial: { id?, type, title, start_date, end_date }
 export default function EventModal({ initial, onClose, onDeleted, onSaved }) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
+  const [mode, setMode] = useState(initial.id ? "view" : "edit");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const isEdit = Boolean(form.id);
@@ -66,6 +72,38 @@ export default function EventModal({ initial, onClose, onDeleted, onSaved }) {
       setBusy(false);
     }
   };
+
+  if (mode === "view") {
+    return (
+      <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+        <div className="modal event-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <h4>일정 상세</h4>
+
+          <div className="event-detail-type">
+            <span aria-hidden="true">{EVENT_TYPE_ICON[form.type] || "📌"}</span>
+            <span>{form.type}</span>
+          </div>
+          <p className="event-detail-title">{form.title}</p>
+          <p className="event-detail-dates">{formatDateRange(form.start_date, form.end_date)}</p>
+
+          {error ? <p className="modal-error">{error}</p> : null}
+
+          <div className="modal-actions">
+            <button type="button" className="danger" onClick={remove} disabled={busy}>
+              삭제
+            </button>
+            <span className="modal-actions-spacer" />
+            <button type="button" onClick={onClose} disabled={busy}>
+              닫기
+            </button>
+            <button type="button" className="primary" onClick={() => setMode("edit")}>
+              편집
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
@@ -140,7 +178,11 @@ export default function EventModal({ initial, onClose, onDeleted, onSaved }) {
             </button>
           ) : null}
           <span className="modal-actions-spacer" />
-          <button type="button" onClick={onClose} disabled={busy}>
+          <button
+            type="button"
+            onClick={() => (isEdit ? setMode("view") : onClose())}
+            disabled={busy}
+          >
             취소
           </button>
           <button type="submit" className="primary" disabled={busy}>
