@@ -35,7 +35,7 @@ export default function DayCard({ activeView, day, hiddenEventCount = 0, onDayCl
           <span className="weekday-label">{day.weekday}</span>
         )}
       </div>
-      <div className="assignments">
+      <div className="assignments" data-assignment-count={day.assignments.length}>
         {activeView === "events" ? (
           null
         ) : day.holidayName ? (
