@@ -650,6 +650,11 @@ h2 {
   font-size: 0.86rem;
   font-weight: 900;
   padding: 8px 12px;
+  /* 모바일 롱프레스(당직표 탭) 대응: 텍스트 선택·iOS 콜아웃·스크롤 제스처 가로채기 방지 */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .tab-button.is-active {

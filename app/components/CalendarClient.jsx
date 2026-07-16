@@ -64,6 +64,7 @@ export default function CalendarClient({
   const [editable, setEditable] = useState(false);
   const [pinPrompting, setPinPrompting] = useState(false);
   const dutyPressTimerRef = useRef(null);
+  const dutyPressOriginRef = useRef(null);
   const [localAssignments, setLocalAssignments] = useState(assignments);
   const [localEventList, setLocalEventList] = useState(() => sortEvents(eventList));
 
@@ -164,16 +165,36 @@ export default function CalendarClient({
     setDayEventsModal(null);
   };
   // 숨겨진 트리거: '당직표' 탭을 800ms 이상 길게 누르면 PIN 입력 모달을 연다.
+  // 모바일 대응: 포인터 캡처로 손가락 미세 이동 시 pointerleave 오취소를 막고,
+  // 일정 거리 이상 움직이면(스크롤 의도) 취소한다. pointerleave에는 의존하지 않는다.
   const DUTY_LONG_PRESS_MS = 800;
-  const startDutyPress = () => {
+  const DUTY_MOVE_TOLERANCE = 10; // px
+  const startDutyPress = (e) => {
     if (editable) return; // 이미 편집 중이면 잠금 버튼으로 처리
     clearTimeout(dutyPressTimerRef.current);
+    dutyPressOriginRef.current = { x: e.clientX, y: e.clientY };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // 캡처 미지원 환경은 무시 (타이머만으로 동작)
+    }
     dutyPressTimerRef.current = setTimeout(() => {
       setPinPrompting(true);
     }, DUTY_LONG_PRESS_MS);
   };
+  const moveDutyPress = (e) => {
+    const origin = dutyPressOriginRef.current;
+    if (!origin) return;
+    if (
+      Math.abs(e.clientX - origin.x) > DUTY_MOVE_TOLERANCE ||
+      Math.abs(e.clientY - origin.y) > DUTY_MOVE_TOLERANCE
+    ) {
+      cancelDutyPress();
+    }
+  };
   const cancelDutyPress = () => {
     clearTimeout(dutyPressTimerRef.current);
+    dutyPressOriginRef.current = null;
   };
   const openDutyEdit = (day) => {
     if (!editable) return;
@@ -261,8 +282,8 @@ export default function CalendarClient({
                       view === "duty"
                         ? {
                             onPointerDown: startDutyPress,
+                            onPointerMove: moveDutyPress,
                             onPointerUp: cancelDutyPress,
-                            onPointerLeave: cancelDutyPress,
                             onPointerCancel: cancelDutyPress,
                             onContextMenu: (e) => e.preventDefault(),
                           }
