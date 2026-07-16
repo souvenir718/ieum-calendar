@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireEditSession } from "../../../lib/edit-session";
 import { getSupabaseAdmin } from "../../../lib/supabase/admin";
-import { parseDutyBody, EDITABLE_SLOTS } from "../../../lib/duties";
+import { parseDutyBody } from "../../../lib/duties";
 import { SLOT_ORDER } from "../../../lib/calendar";
 
 export const dynamic = "force-dynamic";
@@ -63,9 +63,10 @@ export async function PUT(request) {
     .eq("duty_date", date);
   if (readError) return Response.json({ error: readError.message }, { status: 500 });
 
+  // 그 날짜의 실제 전체 슬롯 상태를 반환한다(폐지된 오후2 등 비편집 슬롯 포함).
+  // page.js 초기 로드의 assignments 형태와 동일하게 맞춰, 저장 후 화면 교체가 정확해진다.
   const dayAssignments = (rows ?? [])
     .map((row) => [row.slot, row.staff?.name ?? ""])
-    .filter(([slot]) => EDITABLE_SLOTS.includes(slot))
     .sort((a, b) => SLOT_ORDER[a[0]] - SLOT_ORDER[b[0]]);
 
   revalidatePath("/[month]", "page");
