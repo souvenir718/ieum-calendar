@@ -31,7 +31,7 @@ export default async function MonthPage({ params }) {
   })();
 
   const supabase = getSupabaseServer();
-  const [dutiesRes, holidaysRes, eventsRes] = await Promise.all([
+  const [dutiesRes, holidaysRes, eventsRes, staffRes] = await Promise.all([
     supabase
       .from("duties")
       .select("duty_date, slot, staff:staff_id(name)")
@@ -48,9 +48,16 @@ export default async function MonthPage({ params }) {
       .lte("start_date", monthEnd)
       .gte("end_date", monthStart)
       .order("start_date"),
+    // 당직 편집 시 담당자 선택용 명단 (공개 읽기, 자주 바뀌지 않아 정적 캐시에 포함)
+    supabase
+      .from("staff")
+      .select("id, name")
+      .eq("is_duty_eligible", true)
+      .order("sort_order")
+      .order("name"),
   ]);
 
-  for (const res of [dutiesRes, holidaysRes, eventsRes]) {
+  for (const res of [dutiesRes, holidaysRes, eventsRes, staffRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -91,6 +98,12 @@ export default async function MonthPage({ params }) {
     end_date: row.end_date,
   }));
 
+  // 당직 편집용 담당자 명단
+  const staffList = (staffRes.data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+  }));
+
   return (
     <CalendarClient
       month={month}
@@ -103,6 +116,7 @@ export default async function MonthPage({ params }) {
       holidays={holidays}
       events={events}
       eventList={eventList}
+      staffList={staffList}
     />
   );
 }
