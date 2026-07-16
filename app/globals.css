@@ -777,6 +777,23 @@ h2 {
   box-shadow: inset 0 0 0 2px rgba(47, 111, 159, 0.35);
 }
 
+/* 당직 편집 모드: 편집 가능한 날짜 칸을 은은한 점선 테두리로 표시 */
+.day-card.is-duty-editable {
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.day-card.is-duty-editable:hover {
+  box-shadow: inset 0 0 0 2px var(--green);
+  background: var(--slot-morning-two);
+}
+
+.duty-slot-time {
+  color: var(--muted);
+  font-weight: 600;
+  font-style: normal;
+  font-size: 0.78rem;
+}
+
 .date-row {
   display: flex;
   align-items: baseline;

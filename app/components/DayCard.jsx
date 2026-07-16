@@ -1,20 +1,44 @@
 /**
  * 캘린더의 각 날짜(Day) 칸을 렌더링하고 클릭 이벤트를 처리하는 컴포넌트입니다.
  */
-export default function DayCard({ activeView, day, hiddenEventCount = 0, onDayClick, onMoreClick, style }) {
+export default function DayCard({
+  activeView,
+  day,
+  dutyEditable = false,
+  hiddenEventCount = 0,
+  onDayClick,
+  onDutyClick,
+  onMoreClick,
+  style,
+}) {
   const classes = ["day-card"];
   if (day.isWeekend) classes.push("is-weekend");
   if (day.holidayName) classes.push("is-holiday");
-  const clickable = activeView === "events";
+  // 당직 편집: 잠금 해제 상태 + 평일 + 공휴일 아님 (당직이 실제로 표시되는 날)
+  const dutyClickable =
+    activeView === "duty" && dutyEditable && !day.isWeekend && !day.holidayName;
+  const clickable = activeView === "events" || dutyClickable;
   if (clickable) classes.push("is-clickable");
+  if (dutyClickable) classes.push("is-duty-editable");
   const hasEvents = day.events.length > 0;
+  const handleClick = dutyClickable
+    ? () => onDutyClick?.(day)
+    : activeView === "events"
+      ? () => onDayClick?.(day.key)
+      : undefined;
 
   return (
     <article
       className={classes.join(" ")}
-      onClick={clickable ? () => onDayClick?.(day.key) : undefined}
+      onClick={handleClick}
       style={style}
-      title={clickable ? "클릭해서 이 날짜에 일정 추가" : undefined}
+      title={
+        dutyClickable
+          ? "클릭해서 당직 편집"
+          : activeView === "events"
+            ? "클릭해서 이 날짜에 일정 추가"
+            : undefined
+      }
     >
       <div className="date-row">
         <span className="date-number">{day.day}</span>

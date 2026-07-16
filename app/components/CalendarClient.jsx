@@ -16,6 +16,8 @@ import { TYPE_SLUG } from "../../lib/events";
 import { dutySlots } from "../../lib/print-config";
 
 import EventModal from "./EventModal";
+import DutyModal from "./DutyModal";
+import LockControl from "./LockControl";
 import DayCard from "./DayCard";
 import DayEventsModal from "./DayEventsModal";
 import PrintSheet from "./PrintSheet";
@@ -50,6 +52,7 @@ export default function CalendarClient({
   assignments,
   holidays,
   eventList = [],
+  staffList = [],
 }) {
   const router = useRouter();
   const logoClickCountRef = useRef(0);
@@ -57,6 +60,11 @@ export default function CalendarClient({
   const [activeView, setActiveView] = useState("duty");
   const [modal, setModal] = useState(null);
   const [dayEventsModal, setDayEventsModal] = useState(null);
+  const [dutyModal, setDutyModal] = useState(null);
+  const [editable, setEditable] = useState(false);
+  const [pinPrompting, setPinPrompting] = useState(false);
+  const dutyPressTimerRef = useRef(null);
+  const [localAssignments, setLocalAssignments] = useState(assignments);
   const [localEventList, setLocalEventList] = useState(() => sortEvents(eventList));
 
   useClientLayoutEffect(() => {
@@ -71,6 +79,24 @@ export default function CalendarClient({
   }, [eventList]);
 
   useEffect(() => {
+    setLocalAssignments(assignments);
+  }, [assignments]);
+
+  // 편집 세션(쿠키) 유효 여부 조회 — 정적 페이지라 클라이언트에서 확인한다.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/edit-session")
+      .then((res) => res.json())
+      .then((data) => {
+        if (alive) setEditable(Boolean(data?.editable));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
     router.prefetch(`/${prevMonth}`);
     router.prefetch(`/${nextMonth}`);
   }, [nextMonth, prevMonth, router]);
@@ -83,11 +109,11 @@ export default function CalendarClient({
   );
   const days = getMonthDays(year, monthIndex, {
     holidays,
-    assignments,
+    assignments: localAssignments,
     events: localEvents,
   });
   const weeks = getDutyWeeks(days);
-  const earlyLeave = deriveEarlyLeave(assignments, holidays);
+  const earlyLeave = deriveEarlyLeave(localAssignments, holidays);
   const offset = firstDayOffset(year, monthIndex);
   const trailingEmptyCount = Math.max(0, 42 - offset - days.length);
   const printTitle = `${displayMonth} 당직 및 조기퇴근`;
@@ -136,6 +162,25 @@ export default function CalendarClient({
   const removeLocalEvent = (id) => {
     setLocalEventList((current) => current.filter((event) => event.id !== id));
     setDayEventsModal(null);
+  };
+  // 숨겨진 트리거: '당직표' 탭을 800ms 이상 길게 누르면 PIN 입력 모달을 연다.
+  const DUTY_LONG_PRESS_MS = 800;
+  const startDutyPress = () => {
+    if (editable) return; // 이미 편집 중이면 잠금 버튼으로 처리
+    clearTimeout(dutyPressTimerRef.current);
+    dutyPressTimerRef.current = setTimeout(() => {
+      setPinPrompting(true);
+    }, DUTY_LONG_PRESS_MS);
+  };
+  const cancelDutyPress = () => {
+    clearTimeout(dutyPressTimerRef.current);
+  };
+  const openDutyEdit = (day) => {
+    if (!editable) return;
+    setDutyModal(day);
+  };
+  const applyDutySave = (date, dayAssignments) => {
+    setLocalAssignments((current) => ({ ...current, [date]: dayAssignments }));
   };
   const handleLogoClick = () => {
     logoClickCountRef.current += 1;
@@ -212,6 +257,16 @@ export default function CalendarClient({
                 <div className="calendar-tabs" role="tablist" aria-label="캘린더 종류">
                   {["duty", "events"].map((view) => {
                     const isActive = activeView === view;
+                    const dutyPressHandlers =
+                      view === "duty"
+                        ? {
+                            onPointerDown: startDutyPress,
+                            onPointerUp: cancelDutyPress,
+                            onPointerLeave: cancelDutyPress,
+                            onPointerCancel: cancelDutyPress,
+                            onContextMenu: (e) => e.preventDefault(),
+                          }
+                        : {};
 
                     return (
                       <button
@@ -222,6 +277,7 @@ export default function CalendarClient({
                         data-view={view}
                         key={view}
                         onClick={() => changeView(view)}
+                        {...dutyPressHandlers}
                       >
                         {view === "duty" ? "당직표" : "일정표"}
                       </button>
@@ -235,6 +291,14 @@ export default function CalendarClient({
                 >
                   PDF 출력하기
                 </button>
+                {activeView === "duty" ? (
+                  <LockControl
+                    editable={editable}
+                    onEditableChange={setEditable}
+                    prompting={pinPrompting}
+                    onPromptingChange={setPinPrompting}
+                  />
+                ) : null}
               </div>
               {activeView === "duty" ? (
                 <div className="legend" aria-label="범례">
@@ -273,9 +337,11 @@ export default function CalendarClient({
                   <DayCard
                     activeView={activeView}
                     day={day}
+                    dutyEditable={editable}
                     hiddenEventCount={hiddenEventCounts[day.key] || 0}
                     key={day.key}
                     onDayClick={openAdd}
+                    onDutyClick={openDutyEdit}
                     onMoreClick={setDayEventsModal}
                     style={{ gridColumn: col, gridRow: row }}
                   />
@@ -351,6 +417,14 @@ export default function CalendarClient({
           day={dayEventsModal}
           onClose={() => setDayEventsModal(null)}
           onEventClick={openEditFromDayModal}
+        />
+      ) : null}
+      {dutyModal ? (
+        <DutyModal
+          day={dutyModal}
+          staffList={staffList}
+          onClose={() => setDutyModal(null)}
+          onSaved={applyDutySave}
         />
       ) : null}
 
