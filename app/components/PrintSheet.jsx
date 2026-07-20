@@ -6,8 +6,10 @@ import { printConfig } from "../../lib/print-config";
  * 당직표 및 조기퇴근표 PDF 출력(프린트)을 위한 레이아웃 컴포넌트입니다.
  */
 export default function PrintSheet({ weeks, earlyLeave, title }) {
+  const workdayWeeks = weeks.filter((week) => week.slice(0, 5).some(Boolean));
+
   return (
-    <div className="print-sheet" aria-hidden="true">
+    <div className="print-sheet duty-print-sheet" aria-hidden="true">
       <h1 className="print-title">{title}</h1>
 
       <h2 className="print-section">&lt; 당 직 &gt;</h2>
@@ -87,7 +89,7 @@ export default function PrintSheet({ weeks, earlyLeave, title }) {
           </tr>
         </thead>
         <tbody>
-          {weeks.map((week, weekIndex) => (
+          {workdayWeeks.map((week, weekIndex) => (
             <tr key={`early-${weekIndex}`}>
               {week.slice(0, 5).map((day, cellIndex) => (
                 <td key={`e-${cellIndex}`}>

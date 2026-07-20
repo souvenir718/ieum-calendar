@@ -21,6 +21,7 @@ import LockControl from "./LockControl";
 import DayCard from "./DayCard";
 import DayEventsModal from "./DayEventsModal";
 import PrintSheet from "./PrintSheet";
+import SchedulePrintSheet from "./SchedulePrintSheet";
 import EventLabel, { eventAriaLabel } from "./EventLabel";
 import EventCategoryLegend from "./EventCategoryLegend";
 import {
@@ -117,7 +118,8 @@ export default function CalendarClient({
   const earlyLeave = deriveEarlyLeave(localAssignments, holidays);
   const offset = firstDayOffset(year, monthIndex);
   const trailingEmptyCount = Math.max(0, 42 - offset - days.length);
-  const printTitle = `${displayMonth} 당직 및 조기퇴근`;
+  const dutyPrintTitle = `${displayMonth} 당직 및 조기퇴근`;
+  const schedulePrintTitle = `${displayMonth} 일정표`;
   const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, localEventList);
   const eventSpans = buildEventSpans(
     days,
@@ -449,7 +451,11 @@ export default function CalendarClient({
         />
       ) : null}
 
-      <PrintSheet weeks={weeks} earlyLeave={earlyLeave} title={printTitle} />
+      {activeView === "duty" ? (
+        <PrintSheet weeks={weeks} earlyLeave={earlyLeave} title={dutyPrintTitle} />
+      ) : (
+        <SchedulePrintSheet days={days} offset={offset} title={schedulePrintTitle} />
+      )}
     </>
   );
 }

@@ -1650,6 +1650,119 @@ h2 {
   font-size: 8.5pt;
 }
 
+.duty-print-sheet .early-table td {
+  height: 44px;
+  padding: 2px;
+  font-size: 8pt;
+  line-height: 1.05;
+}
+
+.duty-print-sheet .early-cell {
+  gap: 0;
+}
+
+.duty-print-sheet .viewers-sign td {
+  height: 36px;
+}
+
+.duty-print-sheet .print-footer {
+  margin-top: 4px;
+  font-size: 8pt;
+}
+
+.schedule-print-title {
+  margin-bottom: 10px;
+}
+
+.schedule-print-calendar {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.schedule-print-calendar th,
+.schedule-print-calendar td {
+  border: 1px solid #777;
+}
+
+.schedule-print-calendar th {
+  height: 8mm;
+  background: #f0f0f0;
+  color: #222;
+  font-size: 9pt;
+  text-align: center;
+}
+
+.schedule-print-calendar th.date-red {
+  color: #c00000;
+}
+
+.schedule-print-calendar th.date-blue {
+  color: #1144cc;
+}
+
+.schedule-print-calendar tbody tr {
+  height: 27mm;
+}
+
+.schedule-print-day {
+  padding: 3px;
+  color: #222;
+  font-size: 7.5pt;
+  text-align: left;
+  vertical-align: top;
+}
+
+.schedule-print-date {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 9pt;
+}
+
+.schedule-print-holiday {
+  margin-bottom: 2px;
+  color: #c00000;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.schedule-print-events {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-print-event {
+  overflow: hidden;
+  border-left: 2px solid currentColor;
+  border-radius: 2px;
+  padding: 2px 3px;
+  color: #222;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-print-legend {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 5px;
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.schedule-print-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+
 .stats-page {
   max-width: 720px;
   margin: 0 auto;
@@ -1756,6 +1869,12 @@ h2 {
   @page {
     size: A4 portrait;
     margin: 8mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
   }
 
   body {
