@@ -13,6 +13,36 @@ function monthKeyOf(dutyDate) {
   return dutyDate.slice(0, 7);
 }
 
+function StatsTable({ names, stats }) {
+  return (
+    <table className="stats-table">
+      <thead>
+        <tr>
+          <th>이름</th>
+          {SLOTS.map((slot) => (
+            <th key={slot}>{slot}</th>
+          ))}
+          <th>총합</th>
+        </tr>
+      </thead>
+      <tbody>
+        {names.map((name) => {
+          const person = stats[name];
+          return (
+            <tr key={name}>
+              <td>{name}</td>
+              {SLOTS.map((slot) => (
+                <td key={slot}>{person[slot] || 0}</td>
+              ))}
+              <td>{person.total}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 export default async function StatsPage() {
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
@@ -24,6 +54,7 @@ export default async function StatsPage() {
 
   // stats: { monthKey: { staffName: { slot: count, total: count } } }
   const stats = {};
+  const totalStats = {};
   const staffNames = new Set();
 
   for (const row of data ?? []) {
@@ -35,6 +66,10 @@ export default async function StatsPage() {
     const person = (month[name] ||= { total: 0 });
     person[row.slot] = (person[row.slot] || 0) + 1;
     person.total += 1;
+
+    const totalPerson = (totalStats[name] ||= { total: 0 });
+    totalPerson[row.slot] = (totalPerson[row.slot] || 0) + 1;
+    totalPerson.total += 1;
   }
 
   const monthKeys = Object.keys(stats).sort().reverse();
@@ -43,48 +78,34 @@ export default async function StatsPage() {
   return (
     <div className="stats-page">
       <header className="stats-header">
-        <h1>월별 당직 통계</h1>
+        <h1>당직 통계</h1>
         <Link href={`/${currentMonth()}`}>캘린더로 돌아가기</Link>
       </header>
 
       {monthKeys.length === 0 ? (
         <p>당직 데이터가 없습니다.</p>
       ) : (
-        monthKeys.map((monthKey) => {
-          const monthStats = stats[monthKey];
-          return (
-            <section className="stats-month" key={monthKey}>
-              <h2>{monthKey}</h2>
-              <table className="stats-table">
-                <thead>
-                  <tr>
-                    <th>이름</th>
-                    {SLOTS.map((slot) => (
-                      <th key={slot}>{slot}</th>
-                    ))}
-                    <th>총합</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedStaffNames
-                    .filter((name) => monthStats[name])
-                    .map((name) => {
-                      const person = monthStats[name];
-                      return (
-                        <tr key={name}>
-                          <td>{name}</td>
-                          {SLOTS.map((slot) => (
-                            <td key={slot}>{person[slot] || 0}</td>
-                          ))}
-                          <td>{person.total}</td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </section>
-          );
-        })
+        <>
+          <section className="stats-total">
+            <h2>전체 통계</h2>
+            <StatsTable names={sortedStaffNames} stats={totalStats} />
+          </section>
+
+          {monthKeys.map((monthKey) => {
+            const monthStats = stats[monthKey];
+            const names = sortedStaffNames.filter((name) => monthStats[name]);
+            return (
+              <details className="stats-month" key={monthKey}>
+                <summary className="stats-month-summary">
+                  <span className="stats-month-title">{monthKey}</span>
+                </summary>
+                <div className="stats-month-content">
+                  <StatsTable names={names} stats={monthStats} />
+                </div>
+              </details>
+            );
+          })}
+        </>
       )}
     </div>
   );
