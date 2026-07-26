@@ -151,9 +151,11 @@ export function buildEventSpans(days, eventList, monthStart, monthEnd, offset, v
       const endDay = dayNumberFromKey(toDateKey(segmentEnd));
       const { col: endCol } = calendarPosition(offset, endDay);
       const lanes = rowLanes.get(row) || [];
-      const lane = lanes.findIndex((lastEndCol) => lastEndCol < startCol);
+      const lane = lanes.findIndex((occupied) =>
+        occupied.every((range) => range.endCol < startCol || range.startCol > endCol),
+      );
       const assignedLane = lane === -1 ? lanes.length : lane;
-      lanes[assignedLane] = endCol;
+      lanes[assignedLane] = [...(lanes[assignedLane] || []), { startCol, endCol }];
       rowLanes.set(row, lanes);
 
       spans.push({
