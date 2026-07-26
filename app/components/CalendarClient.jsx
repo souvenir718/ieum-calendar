@@ -218,6 +218,36 @@ export default function CalendarClient({
     }, LOGO_EASTER_EGG_WINDOW_MS);
   };
 
+  // 모바일 스와이프로 월 이동. 가로 이동이 세로보다 뚜렷하고 임계값을 넘을 때만 전환한다.
+  // 왼쪽 스와이프 → 다음 달, 오른쪽 스와이프 → 이전 달. (인접 월은 이미 prefetch됨)
+  const SWIPE_MIN_X = 60; // px, 이 미만은 탭/미세 이동으로 간주
+  const SWIPE_MAX_Y_RATIO = 0.8; // |dy| < |dx| * ratio 여야 가로 스와이프로 인정(세로 스크롤 보호)
+  const swipeRef = useRef(null);
+  const isAnyModalOpen = () =>
+    Boolean(modal || dutyModal || dayEventsModal || pinPrompting);
+  const onCalendarTouchStart = (e) => {
+    // 멀티터치(핀치 줌 등)나 모달 열림 중에는 스와이프를 무시한다.
+    if (e.touches.length !== 1 || isAnyModalOpen()) {
+      swipeRef.current = null;
+      return;
+    }
+    const touch = e.touches[0];
+    swipeRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const onCalendarTouchEnd = (e) => {
+    const origin = swipeRef.current;
+    swipeRef.current = null;
+    if (!origin || isAnyModalOpen()) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - origin.x;
+    const dy = touch.clientY - origin.y;
+    if (Math.abs(dx) < SWIPE_MIN_X) return; // 이동 거리 부족
+    if (Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_Y_RATIO) return; // 세로 스크롤 의도
+    persistCurrentView();
+    router.push(`/${dx < 0 ? nextMonth : prevMonth}`);
+  };
+
   return (
     <>
       <div className="app-shell">
@@ -273,7 +303,11 @@ export default function CalendarClient({
           </nav>
         </header>
 
-        <main className="layout">
+        <main
+          className="layout"
+          onTouchStart={onCalendarTouchStart}
+          onTouchEnd={onCalendarTouchEnd}
+        >
           <section className="calendar-panel" aria-label="월간 캘린더">
             <div className="calendar-toolbar">
               <div className="toolbar-left">
