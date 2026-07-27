@@ -6,6 +6,36 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export const MAX_VISIBLE_EVENTS_PER_DAY = 4;
 export const VIEW_STORAGE_KEY = "ieum-calendar-active-view";
 
+// 편집 가능 여부 캐시: 월 이동(라우트 전환)마다 /api/edit-session을 다시 부르지 않도록
+// sessionStorage에 짧은 TTL로 저장한다. 잠금/해제 시엔 즉시 갱신한다.
+const EDITABLE_CACHE_KEY = "ieum-editable";
+const EDITABLE_CACHE_TTL_MS = 60 * 1000;
+
+export function readEditableCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(EDITABLE_CACHE_KEY);
+    if (!raw) return null;
+    const { value, exp } = JSON.parse(raw);
+    if (typeof exp !== "number" || exp < Date.now()) return null;
+    return Boolean(value);
+  } catch {
+    return null;
+  }
+}
+
+export function writeEditableCache(value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      EDITABLE_CACHE_KEY,
+      JSON.stringify({ value: Boolean(value), exp: Date.now() + EDITABLE_CACHE_TTL_MS }),
+    );
+  } catch {
+    // 저장 실패(프라이빗 모드 등)는 무시 — fetch로 폴백된다.
+  }
+}
+
 export function parseDateKey(key) {
   const [year, month, day] = key.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));

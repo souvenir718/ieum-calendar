@@ -32,6 +32,8 @@ import {
   sortEvents,
   buildEventVisibility,
   buildEventSpans,
+  readEditableCache,
+  writeEditableCache,
 } from "./calendarUtils";
 
 const useClientLayoutEffect =
@@ -85,18 +87,34 @@ export default function CalendarClient({
   }, [assignments]);
 
   // 편집 세션(쿠키) 유효 여부 조회 — 정적 페이지라 클라이언트에서 확인한다.
+  // 월 이동은 라우트 전환이라 이 컴포넌트가 매번 재마운트되므로, 최근 확인 결과를
+  // sessionStorage에 짧게 캐시해 스와이프로 빠르게 넘길 때 API 왕복을 줄인다.
   useEffect(() => {
+    const cached = readEditableCache();
+    if (cached !== null) {
+      setEditable(cached);
+      return;
+    }
     let alive = true;
     fetch("/api/edit-session")
       .then((res) => res.json())
       .then((data) => {
-        if (alive) setEditable(Boolean(data?.editable));
+        if (!alive) return;
+        const value = Boolean(data?.editable);
+        setEditable(value);
+        writeEditableCache(value);
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, []);
+
+  // 잠금/해제 등으로 편집 상태가 바뀌면 캐시도 즉시 갱신한다(stale 방지).
+  const handleEditableChange = (value) => {
+    setEditable(value);
+    writeEditableCache(value);
+  };
 
   useEffect(() => {
     router.prefetch(`/${prevMonth}`);
@@ -109,25 +127,31 @@ export default function CalendarClient({
     () => buildEventsByDay(localEventList, monthStart, monthEnd),
     [localEventList, monthStart, monthEnd],
   );
-  const days = getMonthDays(year, monthIndex, {
-    holidays,
-    assignments: localAssignments,
-    events: localEvents,
-  });
-  const weeks = getDutyWeeks(days);
-  const earlyLeave = deriveEarlyLeave(localAssignments, holidays);
+  const days = useMemo(
+    () =>
+      getMonthDays(year, monthIndex, {
+        holidays,
+        assignments: localAssignments,
+        events: localEvents,
+      }),
+    [year, monthIndex, holidays, localAssignments, localEvents],
+  );
+  const weeks = useMemo(() => getDutyWeeks(days), [days]);
+  const earlyLeave = useMemo(
+    () => deriveEarlyLeave(localAssignments, holidays),
+    [localAssignments, holidays],
+  );
   const offset = firstDayOffset(year, monthIndex);
   const trailingEmptyCount = Math.max(0, 42 - offset - days.length);
   const dutyPrintTitle = `${displayMonth} 당직 및 조기퇴근`;
   const schedulePrintTitle = `${displayMonth} 일정표`;
-  const { visibleEventIds, hiddenEventCounts } = buildEventVisibility(days, localEventList);
-  const eventSpans = buildEventSpans(
-    days,
-    localEventList,
-    monthStart,
-    monthEnd,
-    offset,
-    visibleEventIds,
+  const { visibleEventIds, hiddenEventCounts } = useMemo(
+    () => buildEventVisibility(days, localEventList),
+    [days, localEventList],
+  );
+  const eventSpans = useMemo(
+    () => buildEventSpans(days, localEventList, monthStart, monthEnd, offset, visibleEventIds),
+    [days, localEventList, monthStart, monthEnd, offset, visibleEventIds],
   );
 
   const openAdd = (date) => {
@@ -351,7 +375,7 @@ export default function CalendarClient({
                 {activeView === "duty" ? (
                   <LockControl
                     editable={editable}
-                    onEditableChange={setEditable}
+                    onEditableChange={handleEditableChange}
                     prompting={pinPrompting}
                     onPromptingChange={setPinPrompting}
                   />
