@@ -37,7 +37,7 @@ node --env-file=.env.local scripts/check-rule.mjs    # 당직 규칙 위반 점�
 ### 라우팅 / 렌더링
 - `app/page.js` → `currentMonth()`로 `/{YYYY-MM}` 리다이렉트 (Asia/Seoul 기준).
 - `app/[month]/page.js` — 월 페이지. **`force-static` + `revalidate = 60`** (ISR). 서버에서 Supabase를 anon 키로 읽어 `CalendarClient`에 props로 넘긴다. 쓰기 API는 `revalidatePath`로 이 캐시를 갱신한다.
-- `app/components/CalendarClient.jsx` — 클라이언트 컴포넌트. 달력 그리드 + 이벤트 바 + 모달 + 편집 진입점 전부 담당(461줄).
+- `app/components/CalendarClient.jsx` — 가장 큰 클라이언트 컴포넌트. 달력 그리드 + 이벤트 바 + 모달 + 편집 진입점 + 모바일 스와이프 월 이동을 전부 담당.
 - `app/stats/page.js` — 당직 통계 페이지.
 
 ### 데이터 흐름의 두 갈래
@@ -95,3 +95,8 @@ Supabase SQL Editor에 직접 붙여 실행하는 방식. 마이그레이션 러
 - 날짜 키 포맷은 항상 `"YYYY-MM-DD"` 문자열. 월 페이지 조회 시 월말 오후1의 "다음 근무일"이 다음 달로 넘어갈 수 있어 **공휴일은 다음 달 초까지 확장 조회**한다(`[month]/page.js`의 `holidayWindowEnd`).
 - 이벤트 바가 여러 날에 걸치거나 여러 개 쌓일 때의 세로 배치는 `calendarUtils.js`의 레인 알고리즘이 담당한다. 레인은 각 열 구간의 **실제 겹침**으로 판정한다(끝 열 하나만 보고 판정하지 않음).
 - `docs/`의 `.json` 백업은 데이터 마이그레이션 시점의 스냅샷(예: 오후2 폐지 전). 참고용.
+
+### 성능/상태 관련 주의점
+- **편집 가능 여부 캐시**: 월 이동은 라우트 전환이라 `CalendarClient`가 매번 재마운트된다. 매번 `/api/edit-session`을 부르지 않도록 `sessionStorage`에 60초 TTL로 캐시한다(`calendarUtils.js`의 `readEditableCache`/`writeEditableCache`). **편집 상태(`editable`)를 바꾸는 새 경로를 추가하면 반드시 `writeEditableCache`로 캐시도 갱신**해야 stale이 생기지 않는다. 현재는 `handleEditableChange`가 이 계약을 지킨다.
+- **모바일 스와이프 월 이동**: `main.layout`의 `onTouchStart`/`onTouchEnd`. 가로 우세(`|dx|>|dy|*0.8`) + 최소 이동(60px)일 때만 이동하고, 멀티터치·모달 열림 중에는 무시한다. `preventDefault`를 쓰지 않아 세로 스크롤과 공존한다. 롱프레스(PIN)는 pointer 이벤트라 서로 간섭하지 않는다.
+- **파생 계산 메모이제이션**: `days`/`weeks`/`earlyLeave`/`buildEventVisibility`/`buildEventSpans` 결과는 `useMemo`로 캐시된다. 입력(`localAssignments`/`localEventList`/`holidays` 등)이 바뀔 때만 재계산되므로, 새 파생값을 추가할 때도 같은 패턴을 따른다.
