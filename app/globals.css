@@ -729,8 +729,8 @@ h2 {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   position: relative;
-  --event-stack-top: 28px;
-  --event-row-height: 30px;
+  --event-stack-top: 26px;
+  --event-row-height: 24px;
 }
 
 .weekdays {
@@ -774,6 +774,10 @@ h2 {
   box-shadow: inset 0 0 0 2px rgba(47, 111, 159, 0.75);
 }
 
+.day-card.is-today .date-number {
+  color: var(--blue);
+}
+
 .day-card.is-clickable {
   cursor: pointer;
 }
@@ -808,7 +812,7 @@ h2 {
 }
 
 .date-number {
-  font-size: 1.22rem;
+  font-size: 0.88rem;
   font-weight: 900;
   line-height: 1;
 }
@@ -900,11 +904,11 @@ h2 {
   color: var(--ink);
   cursor: pointer;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 900;
   line-height: 1;
   overflow: hidden;
-  padding: 7px 10px;
+  padding: 5px 8px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -915,35 +919,35 @@ h2 {
 }
 
 .event-span[data-lane="1"] {
-  --event-offset: 38px;
+  --event-offset: 30px;
 }
 
 .event-span[data-lane="2"] {
-  --event-offset: 76px;
+  --event-offset: 60px;
 }
 
 .event-span[data-lane="3"] {
-  --event-offset: 114px;
+  --event-offset: 90px;
 }
 
 .event-span[data-lane="4"] {
-  --event-offset: 152px;
+  --event-offset: 120px;
 }
 
 .event-span[data-lane="5"] {
-  --event-offset: 190px;
+  --event-offset: 150px;
 }
 
 .event-span[data-lane="6"] {
-  --event-offset: 228px;
+  --event-offset: 180px;
 }
 
 .event-span[data-lane="7"] {
-  --event-offset: 266px;
+  --event-offset: 210px;
 }
 
 .event-span[data-lane="8"] {
-  --event-offset: 304px;
+  --event-offset: 240px;
 }
 
 .event-span.event-type-event {
@@ -1171,7 +1175,7 @@ h2 {
   }
 
   .date-number {
-    font-size: 0.9rem;
+    font-size: 0.78rem;
   }
 
   .weekday-label {
@@ -1227,7 +1231,7 @@ h2 {
   }
 
   .date-number {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
   }
 
   .weekday-label {

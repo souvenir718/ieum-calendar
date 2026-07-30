@@ -6,6 +6,7 @@ export default function DayCard({
   day,
   dutyEditable = false,
   hiddenEventCount = 0,
+  isToday = false,
   onDayClick,
   onDutyClick,
   onMoreClick,
@@ -14,6 +15,7 @@ export default function DayCard({
   const classes = ["day-card"];
   if (day.isWeekend) classes.push("is-weekend");
   if (day.holidayName) classes.push("is-holiday");
+  if (isToday) classes.push("is-today");
   // 당직 편집: 잠금 해제 상태 + 평일 + 공휴일 아님 (당직이 실제로 표시되는 날)
   const dutyClickable =
     activeView === "duty" && dutyEditable && !day.isWeekend && !day.holidayName;

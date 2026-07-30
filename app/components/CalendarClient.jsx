@@ -10,6 +10,7 @@ import {
   firstDayOffset,
   getDutyWeeks,
   getMonthDays,
+  todayKey,
   weekdayLabels,
 } from "../../lib/calendar";
 import { TYPE_SLUG } from "../../lib/events";
@@ -70,6 +71,12 @@ export default function CalendarClient({
   const dutyPressOriginRef = useRef(null);
   const [localAssignments, setLocalAssignments] = useState(assignments);
   const [localEventList, setLocalEventList] = useState(() => sortEvents(eventList));
+  const [todayDateKey, setTodayDateKey] = useState(() => todayKey());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTodayDateKey(todayKey()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useClientLayoutEffect(() => {
     const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
@@ -420,6 +427,7 @@ export default function CalendarClient({
                     day={day}
                     dutyEditable={editable}
                     hiddenEventCount={hiddenEventCounts[day.key] || 0}
+                    isToday={day.key === todayDateKey}
                     key={day.key}
                     onDayClick={openAdd}
                     onDutyClick={openDutyEdit}
