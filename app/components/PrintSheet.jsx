@@ -135,7 +135,7 @@ export default function PrintSheet({ weeks, earlyLeave, title }) {
       <table className="print-table viewers-table">
         <tbody>
           <tr>
-            <th className="viewers-label" rowSpan={2}>
+            <th className="viewers-label" rowSpan={3}>
               공람
             </th>
             {printConfig.viewers.map((group) => (
@@ -152,7 +152,6 @@ export default function PrintSheet({ weeks, earlyLeave, title }) {
             )}
           </tr>
           <tr className="viewers-sign">
-            <th>&nbsp;</th>
             {printConfig.viewers.flatMap((group) =>
               group.members.map((_, memberIndex) => (
                 <td key={`sign-${group.group}-${memberIndex}`} />
