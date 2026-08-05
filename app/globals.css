@@ -157,7 +157,7 @@ h2 {
 
 .brand-logo {
   display: block;
-  width: min(360px, calc(100vw - 150px));
+  width: min(260px, calc(100vw - 150px));
   height: auto;
   object-fit: contain;
 }
@@ -1159,8 +1159,8 @@ h2 {
   }
 
   .brand-logo {
-    width: min(270px, calc(100vw - 140px));
-    max-height: 76px;
+    width: min(195px, calc(100vw - 140px));
+    max-height: 55px;
   }
 
   .month-badge {
@@ -1215,6 +1215,11 @@ h2 {
     min-height: 0;
     height: 100%;
     grid-auto-rows: minmax(0, 1fr);
+  }
+
+  .calendar-grid--events {
+    grid-auto-rows: minmax(122px, 1fr);
+    overflow-y: auto;
   }
 
   .day-card {
@@ -1345,10 +1350,10 @@ h2 {
   }
 
   .brand-logo {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
-    width: min(210px, calc(100vw - 184px));
-    max-height: 52px;
+    width: min(150px, calc(100vw - 184px));
+    max-height: 38px;
   }
 
   .month-switch {
@@ -1440,6 +1445,11 @@ h2 {
     grid-auto-rows: minmax(0, 1fr);
     --event-stack-top: 24px;
     --event-row-height: 18px;
+  }
+
+  .calendar-grid--events {
+    grid-auto-rows: minmax(96px, 1fr);
+    overflow-y: auto;
   }
 
   .day-card {

@@ -301,8 +301,8 @@ export default function CalendarClient({
             className="brand-logo"
             src="/assets/ieum-kindergarten.png"
             alt="이음어린이집"
-            width={1254}
-            height={444}
+            width={968}
+            height={210}
             priority
             onClick={handleLogoClick}
           />
@@ -424,7 +424,7 @@ export default function CalendarClient({
                 <span key={weekday}>{weekday}</span>
               ))}
             </div>
-            <div className="calendar-grid">
+            <div className={`calendar-grid${activeView === "events" ? " calendar-grid--events" : ""}`}>
               {Array.from({ length: offset }, (_, index) => (
                 <div
                   className="day-card is-empty"
