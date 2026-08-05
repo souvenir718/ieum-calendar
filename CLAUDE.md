@@ -85,7 +85,7 @@ Supabase SQL Editor에 직접 붙여 실행하는 방식. 마이그레이션 러
 - 배정 제약(반 겹침, 연속일 같은 슬롯 금지, 요일 균등 등)의 전체 명세는 `README.md`와 `docs/당직규칙.md`에 있고, `scripts/check-rule.mjs`로 점검한다.
 
 ### 일정 카테고리 (`lib/events.js`)
-- `EVENT_TYPES = ["행사","휴가","생일","중요","기타"]` — DB `event_type` enum과 반드시 일치.
+- `EVENT_TYPES = ["행사","연차","오전반차","오후반차","생일","중요","기타"]` — DB `event_type` enum과 반드시 일치.
 - 새 카테고리 추가 시: enum 마이그레이션(`ALTER TYPE ... ADD VALUE`) + `EVENT_TYPES`/`TYPE_SLUG`/`EVENT_TYPE_ICON` 3곳 + `globals.css` 색상 클래스를 함께 갱신.
 
 ## 관례 / 주의점
