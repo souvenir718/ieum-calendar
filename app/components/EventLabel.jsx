@@ -1,11 +1,7 @@
 import { EVENT_TYPE_ICON } from "../../lib/events";
 
-export function eventMobileLabel(event) {
+export function eventLabel(event) {
   return `${EVENT_TYPE_ICON[event.type] || "📌"} ${event.title}`;
-}
-
-export function eventDesktopLabel(event) {
-  return `[${EVENT_TYPE_ICON[event.type] || "📌"} ${event.type}] ${event.title}`;
 }
 
 export function eventAriaLabel(event) {
@@ -13,13 +9,9 @@ export function eventAriaLabel(event) {
 }
 
 /**
- * 개별 이벤트의 모바일 및 데스크톱용 텍스트/아이콘 라벨을 표시하는 UI 컴포넌트입니다.
+ * 개별 이벤트의 아이콘+제목 라벨을 표시하는 UI 컴포넌트입니다. 카테고리 구분은
+ * 색상/아이콘으로 충분히 되므로 종류 이름은 텍스트로 반복하지 않는다.
  */
 export default function EventLabel({ event }) {
-  return (
-    <>
-      <span className="event-label-mobile">{eventMobileLabel(event)}</span>
-      <span className="event-label-desktop">{eventDesktopLabel(event)}</span>
-    </>
-  );
+  return <span className="event-label">{eventLabel(event)}</span>;
 }

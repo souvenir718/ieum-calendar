@@ -184,6 +184,16 @@ export default function CalendarClient({
     const day = days.find((d) => d.key === dateKey);
     if (day) setDayEventsModal(day);
   };
+  // 모바일에서는 좁은 이벤트 바를 탭하기 어려우니 날짜 바텀시트를 먼저 보여주고,
+  // PC에서는 바로 상세 모달로 연결한다. app/globals.css의 720px 분기와 맞춘다.
+  const MOBILE_BREAKPOINT = 720;
+  const handleEventSpanClick = (ev) => {
+    if (typeof window !== "undefined" && window.innerWidth <= MOBILE_BREAKPOINT) {
+      openDayEvents(ev.dateKey);
+    } else {
+      openEdit(ev);
+    }
+  };
   const changeView = (view) => {
     setActiveView(view);
     window.localStorage.setItem(VIEW_STORAGE_KEY, view);
@@ -482,9 +492,9 @@ export default function CalendarClient({
                         data-lane={event.lane}
                         onClick={(e) => {
                           e.stopPropagation();
-                          openDayEvents(event.dateKey);
+                          handleEventSpanClick(event);
                         }}
-                        title="클릭해서 이 날짜 일정 보기"
+                        title="클릭해서 일정 확인"
                       >
                         <EventLabel event={event} />
                       </button>

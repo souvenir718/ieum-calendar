@@ -450,14 +450,6 @@ h2 {
   filter: brightness(0.97);
 }
 
-.event-label-mobile {
-  display: none;
-}
-
-.event-label-desktop {
-  display: inline;
-}
-
 .day-event-row.event-type-event {
   border-left-color: var(--blue);
   background: #f5f8fb;
@@ -1504,14 +1496,6 @@ h2 {
     padding: 4px 3px;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .event-label-mobile {
-    display: inline;
-  }
-
-  .event-label-desktop {
-    display: none;
   }
 
   .event-category-legend {
