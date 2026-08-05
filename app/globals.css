@@ -1478,6 +1478,20 @@ h2 {
     --event-offset: 44px;
   }
 
+  .day-events-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .day-events-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 78vh;
+    border-radius: 16px 16px 0 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    animation: sheet-slide-up 0.22s ease-out;
+  }
+
   .event-span[data-lane="3"] {
     --event-offset: 66px;
   }
@@ -1522,6 +1536,15 @@ h2 {
   .muted-label {
     color: var(--closed-text);
     padding-left: 0;
+  }
+}
+
+@keyframes sheet-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 

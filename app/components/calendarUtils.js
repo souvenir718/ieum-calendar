@@ -194,6 +194,7 @@ export function buildEventSpans(days, eventList, monthStart, monthEnd, offset, v
         kind: event.kind,
         type: event.type,
         title: event.title,
+        dateKey: toDateKey(segmentStart),
         row,
         startCol,
         endCol,

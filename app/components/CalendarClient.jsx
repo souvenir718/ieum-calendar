@@ -180,6 +180,10 @@ export default function CalendarClient({
     setDayEventsModal(null);
     openEdit(ev);
   };
+  const openDayEvents = (dateKey) => {
+    const day = days.find((d) => d.key === dateKey);
+    if (day) setDayEventsModal(day);
+  };
   const changeView = (view) => {
     setActiveView(view);
     window.localStorage.setItem(VIEW_STORAGE_KEY, view);
@@ -478,9 +482,9 @@ export default function CalendarClient({
                         data-lane={event.lane}
                         onClick={(e) => {
                           e.stopPropagation();
-                          openEdit(event);
+                          openDayEvents(event.dateKey);
                         }}
-                        title="클릭해서 수정"
+                        title="클릭해서 이 날짜 일정 보기"
                       >
                         <EventLabel event={event} />
                       </button>
@@ -506,6 +510,11 @@ export default function CalendarClient({
           day={dayEventsModal}
           onClose={() => setDayEventsModal(null)}
           onEventClick={openEditFromDayModal}
+          onAddClick={() => {
+            const key = dayEventsModal.key;
+            setDayEventsModal(null);
+            openAdd(key);
+          }}
         />
       ) : null}
       {dutyModal ? (
