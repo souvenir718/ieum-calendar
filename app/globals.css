@@ -34,6 +34,9 @@
   --color-birthday-bg-soft: #f7bfda;
   --color-birthday-text: #9f316a;
   --color-important-bg-soft: #f3c6cf;
+  --z-content: 1;
+  --z-content-raised: 2;
+  --z-overlay: 50;
   color-scheme: light;
   font-family:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -270,7 +273,7 @@ h2 {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--z-overlay);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -799,7 +802,7 @@ h2 {
   border-bottom: 1px solid var(--line);
   background: var(--surface);
   padding: 10px;
-  z-index: 1;
+  z-index: var(--z-content);
 }
 
 .day-card:nth-child(7n) {
@@ -938,7 +941,7 @@ h2 {
 }
 
 .event-span {
-  z-index: 2;
+  z-index: var(--z-content-raised);
   align-self: start;
   height: var(--event-row-height);
   min-width: 0;
