@@ -822,6 +822,11 @@ h2 {
   box-shadow: inset 0 0 0 2px rgba(47, 111, 159, 0.75);
 }
 
+.day-card.is-today {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
 .day-card.is-today .date-number {
   color: var(--blue);
 }
