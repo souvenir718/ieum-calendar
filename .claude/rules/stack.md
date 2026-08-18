@@ -31,3 +31,4 @@ node --env-file=.env.local scripts/check-rule.mjs    # 당직 규칙 위반 점�
 - `SUPABASE_SERVICE_ROLE_KEY` — **서버 전용**. RLS 우회. `NEXT_PUBLIC_` 붙이면 안 됨.
 - `EDIT_PIN` — 당직 편집 잠금 해제 PIN.
 - `EDIT_SESSION_SECRET` — 편집 세션 쿠키 서명 키(32바이트+ 랜덤).
+- `REVALIDATE_SECRET` — `POST /api/revalidate` 인증용 비밀값. 당직표를 스크립트로 직접 upsert(예: 월별 배정 시드)한 뒤 `node --env-file=.env.local scripts/revalidate.mjs 2026-09`로 ISR 캐시를 즉시 무효화할 때 쓴다.

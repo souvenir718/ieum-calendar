@@ -28,6 +28,7 @@
 - `POST/DELETE/GET /api/edit-session` — 편집 잠금 해제/잠금/조회.
 - `POST /api/events`, `PUT/DELETE /api/events/[id]` — 일정 CRUD (인증 없음).
 - `PUT /api/duties` — 한 날짜의 슬롯별 담당자 upsert/삭제 (**PIN 세션 필수**).
+- `POST /api/revalidate` — 월 페이지 + `/stats`의 ISR 캐시 무효화. `REVALIDATE_SECRET` 필요. 시드 스크립트로 `duties`/`events`를 직접 upsert했을 때 `scripts/revalidate.mjs`로 호출한다.
 
 ## 순수 로직은 `lib/`에 분리
 
