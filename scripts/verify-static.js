@@ -1,229 +1,117 @@
-const fs = require("node:fs");
+// DB 자격 증명 없이 현재 캘린더 로직과 월별 조회 경계를 검증한다.
+const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
 const path = require("node:path");
 
-const root = path.resolve(__dirname, "..");
-const requiredFiles = [
-  "app/layout.js",
-  "app/page.js",
-  "app/globals.css",
-  "public/assets/ieum-kindergarten.png",
-  "vercel.json",
-];
-const missing = requiredFiles.filter((file) => !fs.existsSync(path.join(root, file)));
-
-if (missing.length > 0) {
-  console.error(`Missing required files: ${missing.join(", ")}`);
-  process.exit(1);
+// package.json의 CommonJS 설정을 유지하면서 독립적인 ESM 모듈을 로드한다.
+async function loadModule(file) {
+  const source = await fs.readFile(path.join(__dirname, "..", file), "utf8");
+  return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 }
 
-const app = fs.readFileSync(path.join(root, "app/page.js"), "utf8");
-const legacyAfternoonCount = Array.from(app.matchAll(/\["오후",\s*"[^"]+"\]/g)).length;
-const assignments = Array.from(
-  app.matchAll(/\["(오전1|오전2|오후1|오후2)",\s*"([^"]+)"\]/g),
-);
-const assignmentCount = assignments.length;
-const expectedTotals = {
-  김민경: 12,
-  이혜빈: 12,
-  봉은영: 12,
-  홍여진: 12,
-  어영경: 12,
-  최옥희: 12,
-  정지혜: 12,
-};
-const expectedSlotCounts = {
-  오전1: { 김민경: 3, 이혜빈: 3, 봉은영: 3, 홍여진: 3, 어영경: 3, 최옥희: 3, 정지혜: 3 },
-  오전2: { 김민경: 3, 이혜빈: 3, 봉은영: 3, 홍여진: 3, 어영경: 3, 최옥희: 3, 정지혜: 3 },
-  오후1: { 김민경: 3, 이혜빈: 3, 봉은영: 3, 홍여진: 3, 어영경: 3, 최옥희: 3, 정지혜: 3 },
-  오후2: { 김민경: 3, 이혜빈: 3, 봉은영: 3, 홍여진: 3, 어영경: 3, 최옥희: 3, 정지혜: 3 },
-};
-const classes = {
-  이혜빈: "포근반",
-  정지혜: "포근반",
-  홍여진: "포근반",
-  김민경: "다솜반",
-  최옥희: "다솜반",
-  어영경: "도담반",
-  봉은영: "라온반",
-};
-const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
-
-if (legacyAfternoonCount > 0) {
-  console.error(`Found ${legacyAfternoonCount} legacy 오후 assignments.`);
-  process.exit(1);
+function database(tables, failure) {
+  return {
+    from(table) {
+      let rows = [...(tables[table] || [])];
+      const query = {
+        select() { return query; },
+        eq(key, value) { rows = rows.filter(row => row[key] === value); return query; },
+        lt(key, value) { rows = rows.filter(row => row[key] < value); return query; },
+        gte(key, value) { rows = rows.filter(row => row[key] >= value); return query; },
+        lte(key, value) { rows = rows.filter(row => row[key] <= value); return query; },
+        order(key, { ascending }) {
+          rows.sort((a, b) => a[key].localeCompare(b[key]) * (ascending ? 1 : -1));
+          return query;
+        },
+        limit(count) { rows = rows.slice(0, count); return query; },
+        then(resolve, reject) {
+          return Promise.resolve({ data: rows, error: table === failure ? { message: "DB unavailable" } : null })
+            .then(resolve, reject);
+        },
+      };
+      return query;
+    },
+  };
 }
 
-if (app.includes('"2026-07-01": [')) {
-  console.error("2026-07-01 should not have duty assignments.");
-  process.exit(1);
-}
-
-if (assignmentCount !== 84) {
-  console.error(`Expected 84 assignments, found ${assignmentCount}.`);
-  process.exit(1);
-}
-
-const totals = Object.fromEntries(Object.keys(expectedTotals).map((person) => [person, 0]));
-const slotCounts = Object.fromEntries(
-  Object.keys(expectedSlotCounts).map((slot) => [
-    slot,
-    Object.fromEntries(Object.keys(expectedTotals).map((person) => [person, 0])),
-  ]),
-);
-
-for (const [, slot, person] of assignments) {
-  if (!(person in totals)) {
-    console.error(`Unexpected person: ${person}.`);
-    process.exit(1);
+async function main() {
+  const calendar = await loadModule("lib/calendar.js");
+  const { loadMonthDutyData } = await loadModule("lib/calendar-data.js");
+  const { parseEventBody } = await loadModule("lib/events.js");
+  const { parseDutyBody } = await loadModule("lib/duties.js");
+  let count = 0;
+  async function check(name, run) {
+    await run();
+    console.log(`✓ ${name}`);
+    count++;
+  }
+  const duty = (date, slot, name) => ({ duty_date: date, slot, staff: { name } });
+  async function earlyLeave(tables, monthStart, monthEnd) {
+    const data = await loadMonthDutyData(database(tables), monthStart, monthEnd, monthEnd);
+    const assignments = {};
+    for (const row of data.duties) (assignments[row.duty_date] ||= []).push([row.slot, row.staff.name]);
+    const holidays = Object.fromEntries(data.holidays.map(row => [row.holiday_date, row.name]));
+    return { data, assignments, leave: calendar.deriveEarlyLeave(assignments, holidays) };
   }
 
-  totals[person] += 1;
-  slotCounts[slot][person] += 1;
-}
-
-for (const [person, expected] of Object.entries(expectedTotals)) {
-  if (totals[person] !== expected) {
-    console.error(`Expected ${person} to have ${expected} assignments, found ${totals[person]}.`);
-    process.exit(1);
-  }
-}
-
-for (const [slot, expectedByPerson] of Object.entries(expectedSlotCounts)) {
-  for (const [person, expected] of Object.entries(expectedByPerson)) {
-    if (slotCounts[slot][person] !== expected) {
-      console.error(
-        `Expected ${person} to have ${expected} ${slot} assignments, found ${slotCounts[slot][person]}.`,
-      );
-      process.exit(1);
+  await check("전월 말 오후1 → 월초 0.5 조기퇴근, 현재 월 당직 유지", async () => {
+    const result = await earlyLeave({ duties: [
+      duty("2026-08-28", "오후1", "이전 담당"),
+      duty("2026-08-31", "오후1", "전월 담당"),
+      duty("2026-08-31", "오전1", "전월 오전"),
+      duty("2026-09-01", "오전1", "이번 달 담당"),
+      duty("2026-10-01", "오전1", "다음 달 담당"),
+    ] }, "2026-09-01", "2026-09-30");
+    assert.deepEqual(result.leave["2026-09-01"], [["이번 달 담당", "1.5"], ["전월 담당", "0.5"]]);
+    assert.equal(result.data.duties.length, 2);
+    const days = calendar.getMonthDays(2026, 8, { assignments: result.assignments });
+    assert.equal(days.length, 30);
+    assert.deepEqual(days[0].assignments, [["오전1", "이번 달 담당"]]);
+  });
+  await check("연도 경계·주말·공휴일을 건너뛴 조기퇴근", async () => {
+    const result = await earlyLeave({
+      duties: [duty("2026-12-31", "오후1", "담당")],
+      holidays: [{ holiday_date: "2027-01-01", name: "신정" }],
+    }, "2027-01-01", "2027-01-31");
+    assert.deepEqual(result.leave["2027-01-04"], [["담당", "0.5"]]);
+    assert.equal(result.leave["2027-01-01"], undefined);
+  });
+  await check("전월부터 이어지는 긴 연휴도 고정 조회 기간 없이 처리", async () => {
+    const holidays = Array.from({ length: 10 }, (_, i) => ({ holiday_date: `2026-08-${22 + i}`, name: "테스트 휴일" }));
+    const result = await earlyLeave({ duties: [duty("2026-08-21", "오후1", "담당")], holidays }, "2026-09-01", "2026-09-30");
+    assert.deepEqual(result.leave["2026-09-01"], [["담당", "0.5"]]);
+  });
+  await check("오래된 이전 배정은 이번 달 조기퇴근으로 이월하지 않음", async () => {
+    const result = await earlyLeave({ duties: [duty("2026-07-01", "오후1", "담당")] }, "2026-09-01", "2026-09-30");
+    assert.equal(result.leave["2026-09-01"], undefined);
+  });
+  await check("이전 배정·현재 배정이 없어도 정상 처리", async () => {
+    const result = await earlyLeave({}, "2026-09-01", "2026-09-30");
+    assert.deepEqual(result.leave, {});
+  });
+  await check("DB 조회 실패를 빈 당직표로 숨기지 않음", async () => {
+    for (const table of ["duties", "holidays"]) {
+      await assert.rejects(loadMonthDutyData(database({}, table), "2026-09-01", "2026-09-30", "2026-10-07"), /DB unavailable/);
     }
-  }
+  });
+  await check("윤년·연도 경계·잘못된 월 처리", () => {
+    assert.equal(calendar.daysInMonth(2024, 1), 29);
+    assert.equal(calendar.adjacentMonth("2026-12", 1), "2027-01");
+    assert.equal(calendar.adjacentMonth("2027-01", -1), "2026-12");
+    assert.equal(calendar.parseMonth("2026-13"), null);
+  });
+  await check("일정 제목·기간 검증 및 종료일 기본값", () => {
+    const body = { type: "행사", title: " 행사 ", start_date: "2026-09-14" };
+    assert.equal(parseEventBody(body).value.end_date, "2026-09-14");
+    assert.equal(parseEventBody(body).value.title, "행사");
+    assert.ok(parseEventBody({ ...body, title: " " }).error);
+    assert.ok(parseEventBody({ ...body, end_date: "2026-09-13" }).error);
+  });
+  await check("당직 슬롯·담당자 형식 검증 및 배정 해제", () => {
+    assert.ok(parseDutyBody({ date: "2026-09-14", assignments: { 야간: null } }).error);
+    assert.ok(parseDutyBody({ date: "2026-09-14", assignments: { 오전1: "invalid" } }).error);
+    assert.deepEqual(parseDutyBody({ date: "2026-09-14", assignments: { 오전1: "" } }).value.assignments, { 오전1: null });
+  });
+  console.log(`\n${count} checks passed.`);
 }
-
-const dateBlocks = Array.from(app.matchAll(/"(\d{4}-\d{2}-\d{2})": \[\n([\s\S]*?)\n    \]/g));
-const weekdayCounts = Object.fromEntries(
-  Object.keys(expectedTotals).map((person) => [
-    person,
-    { 월: 0, 화: 0, 수: 0, 목: 0, 금: 0 },
-  ]),
-);
-const slotWeekdayCounts = Object.fromEntries(
-  Object.keys(expectedTotals).map((person) => [
-    person,
-    Object.fromEntries(
-      Object.keys(expectedSlotCounts).map((slot) => [slot, { 월: 0, 화: 0, 수: 0, 목: 0, 금: 0 }]),
-    ),
-  ]),
-);
-const dayPatterns = new Set();
-let previousAfternoonTwo = "";
-let previousAfternoonOne = "";
-let previousDayAssignments = null;
-let afternoonOneNextDayDuty = 0;
-const afternoonOneNextDayDutyDays = [];
-
-for (const [, date, block] of dateBlocks) {
-  const weekday = weekdayLabels[new Date(`${date}T00:00:00Z`).getUTCDay()];
-  const dayAssignments = Object.fromEntries(
-    Array.from(block.matchAll(/\["(오전1|오전2|오후1|오후2)",\s*"([^"]+)"\]/g)).map(
-      ([, slot, person]) => [slot, person],
-    ),
-  );
-  const morningTeachers = [dayAssignments["오전1"], dayAssignments["오전2"]];
-  const afternoonTeachers = [dayAssignments["오후1"], dayAssignments["오후2"]];
-  const pattern = Object.entries(dayAssignments)
-    .map(([slot, person]) => `${slot}:${person}`)
-    .join("|");
-
-  if (new Set(Object.values(dayAssignments)).size !== 4) {
-    console.error(`Expected 4 different teachers on ${date}.`);
-    process.exit(1);
-  }
-
-  if (dayPatterns.has(pattern)) {
-    console.error(`Repeated day pattern found on ${date}.`);
-    process.exit(1);
-  }
-
-  dayPatterns.add(pattern);
-
-  if (classes[morningTeachers[0]] === classes[morningTeachers[1]]) {
-    console.error(`Morning class conflict on ${date}: ${morningTeachers.join(", ")}.`);
-    process.exit(1);
-  }
-
-  if (classes[afternoonTeachers[0]] === classes[afternoonTeachers[1]]) {
-    console.error(`Afternoon class conflict on ${date}: ${afternoonTeachers.join(", ")}.`);
-    process.exit(1);
-  }
-
-  if (previousAfternoonTwo && morningTeachers.includes(previousAfternoonTwo)) {
-    console.error(`${previousAfternoonTwo} has morning duty on ${date} after previous 오후2 duty.`);
-    process.exit(1);
-  }
-
-  if (previousAfternoonOne && afternoonTeachers.includes(previousAfternoonOne)) {
-    console.error(`${previousAfternoonOne} has afternoon duty on ${date} after previous 오후1 duty.`);
-    process.exit(1);
-  }
-
-  // (소프트) 오후1 담당자가 다음 근무일에 오전 당직을 맡은 경우 — 실패는 아니고 집계만
-  if (previousAfternoonOne && morningTeachers.includes(previousAfternoonOne)) {
-    afternoonOneNextDayDuty += 1;
-    afternoonOneNextDayDutyDays.push(`${date}(${previousAfternoonOne})`);
-  }
-
-  if (previousDayAssignments) {
-    for (const slot of ["오전1", "오전2", "오후1", "오후2"]) {
-      if (dayAssignments[slot] === previousDayAssignments[slot]) {
-        console.error(`${dayAssignments[slot]} has consecutive ${slot} duty ending on ${date}.`);
-        process.exit(1);
-      }
-    }
-  }
-
-  for (const [slot, person] of Object.entries(dayAssignments)) {
-    weekdayCounts[person][weekday] += 1;
-    slotWeekdayCounts[person][slot][weekday] += 1;
-  }
-
-  previousAfternoonTwo = dayAssignments["오후2"];
-  previousAfternoonOne = dayAssignments["오후1"];
-  previousDayAssignments = dayAssignments;
-}
-
-for (const [person, counts] of Object.entries(weekdayCounts)) {
-  for (const [weekday, count] of Object.entries(counts)) {
-    if (count < 2) {
-      console.error(`Expected ${person} to have at least 2 assignments on ${weekday}, found ${count}.`);
-      process.exit(1);
-    }
-
-    if (count > 3) {
-      console.error(`Expected ${person} to have at most 3 assignments on ${weekday}, found ${count}.`);
-      process.exit(1);
-    }
-  }
-}
-
-for (const [person, slots] of Object.entries(slotWeekdayCounts)) {
-  for (const [slot, counts] of Object.entries(slots)) {
-    for (const [weekday, count] of Object.entries(counts)) {
-      if (count > 1) {
-        console.error(
-          `Expected ${person} to have at most 1 ${slot} assignment on ${weekday}, found ${count}.`,
-        );
-        process.exit(1);
-      }
-    }
-  }
-}
-
-if (afternoonOneNextDayDuty === 0) {
-  console.log("[soft] 오후1 담당자는 다음 근무일에 당직 없음 (충돌 0건).");
-} else {
-  console.warn(
-    `[soft] 오후1 담당자가 다음 근무일에 오전 당직을 맡은 경우 ${afternoonOneNextDayDuty}건: ${afternoonOneNextDayDutyDays.join(", ")}`,
-  );
-}
-
-console.log("Next calendar files verified.");
+main().catch(error => { console.error(error); process.exitCode = 1; });

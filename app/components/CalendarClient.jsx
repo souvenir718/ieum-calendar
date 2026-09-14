@@ -162,7 +162,7 @@ export default function CalendarClient({
   );
 
   const openAdd = (date) => {
-    const d = date || `${month}-01`;
+    const d = date || todayKey();
     setModal({ type: "행사", title: "", start_date: d, end_date: d });
   };
   const openEdit = (ev) => {

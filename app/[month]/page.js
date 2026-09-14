@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getSupabaseServer } from "../../lib/supabase/server";
+import { loadMonthDutyData } from "../../lib/calendar-data";
 import {
   adjacentMonth,
   dateKey,
@@ -31,17 +32,8 @@ export default async function MonthPage({ params }) {
   })();
 
   const supabase = getSupabaseServer();
-  const [dutiesRes, holidaysRes, eventsRes, staffRes] = await Promise.all([
-    supabase
-      .from("duties")
-      .select("duty_date, slot, staff:staff_id(name)")
-      .gte("duty_date", monthStart)
-      .lte("duty_date", monthEnd),
-    supabase
-      .from("holidays")
-      .select("holiday_date, name")
-      .gte("holiday_date", monthStart)
-      .lte("holiday_date", holidayWindowEnd),
+  const [dutyData, eventsRes, staffRes] = await Promise.all([
+    loadMonthDutyData(supabase, monthStart, monthEnd, holidayWindowEnd),
     supabase
       .from("events")
       .select("id, type, title, start_date, end_date")
@@ -57,13 +49,13 @@ export default async function MonthPage({ params }) {
       .order("name"),
   ]);
 
-  for (const res of [dutiesRes, holidaysRes, eventsRes, staffRes]) {
+  for (const res of [eventsRes, staffRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
   // assignments: { "YYYY-MM-DD": [[slot, name], ...] } (슬롯 순 정렬)
   const assignments = {};
-  for (const row of dutiesRes.data ?? []) {
+  for (const row of dutyData.duties) {
     const name = row.staff?.name ?? "";
     (assignments[row.duty_date] ||= []).push([row.slot, name]);
   }
@@ -73,7 +65,7 @@ export default async function MonthPage({ params }) {
 
   // holidays: { "YYYY-MM-DD": name }
   const holidays = {};
-  for (const row of holidaysRes.data ?? []) {
+  for (const row of dutyData.holidays) {
     holidays[row.holiday_date] = row.name;
   }
 
