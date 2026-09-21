@@ -21,6 +21,13 @@ node --env-file=.env.local scripts/seed.mjs          # 초기 시드 (멱등)
 node --env-file=.env.local scripts/seed-holidays.mjs # 공휴일 시드 (멱등)
 node --env-file=.env.local scripts/check.mjs         # 시드/공개읽기 확인
 node --env-file=.env.local scripts/check-rule.mjs    # 당직 규칙 위반 점검
+node --env-file=.env.local scripts/check-balance.mjs # 당직 누적 균등성 점검(월/슬롯/요일/보상)
+
+# 월별 당직 초안 생성 — 시드 고정이라 같은 입력이면 같은 결과가 나온다
+node --env-file=.env.local scripts/plan-duties.mjs 2026-10                      # 초안 출력만
+node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --json               # 초안을 JSON으로
+node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --fix 2026-10-01:오후1=김민경
+node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --apply              # duties upsert
 ```
 
 배포: `npx vercel@latest` (프리뷰) / `npx vercel@latest --prod` (운영).
