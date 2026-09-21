@@ -4,7 +4,7 @@
 
 ## 스택
 
-- **Next.js 16** (App Router) · **React 19** · JavaScript (TypeScript 아님)
+- **Next.js 16** (App Router) · **React 19** · JavaScript (TypeScript 아님, `package.json`은 `"type": "module"`)
 - **Supabase** (Postgres + RLS) — 유일한 런타임 데이터 소스
 - **Vercel** 배포 · `@vercel/analytics`
 - 상태관리/CSS 라이브러리 없음. 스타일은 전부 `app/globals.css`(약 1900줄) 한 파일.
@@ -14,7 +14,7 @@
 ```bash
 npm run dev          # 개발 서버 (localhost:3000)
 npm run build        # 프로덕션 빌드
-npm run verify       # 정적 필수 파일 존재 검사 (scripts/verify-static.js)
+npm run verify       # 정적 필수 파일 존재 검사 (scripts/verify-static.mjs)
 
 # 일회성 스크립트는 .env.local을 직접 주입해서 실행
 node --env-file=.env.local scripts/seed.mjs          # 초기 시드 (멱등)
