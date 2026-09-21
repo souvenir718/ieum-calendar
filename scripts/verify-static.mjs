@@ -1,13 +1,10 @@
 // DB 자격 증명 없이 현재 캘린더 로직과 월별 조회 경계를 검증한다.
-const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
+import assert from "node:assert/strict";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-// package.json의 CommonJS 설정을 유지하면서 독립적인 ESM 모듈을 로드한다.
-async function loadModule(file) {
-  const source = await fs.readFile(path.join(__dirname, "..", file), "utf8");
-  return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
-}
+const repoRoot = path.join(import.meta.dirname, "..");
+const loadModule = (file) => import(pathToFileURL(path.join(repoRoot, file)).href);
 
 function database(tables, failure) {
   return {
@@ -70,11 +67,43 @@ async function main() {
   });
   await check("연도 경계·주말·공휴일을 건너뛴 조기퇴근", async () => {
     const result = await earlyLeave({
-      duties: [duty("2026-12-31", "오후1", "담당")],
-      holidays: [{ holiday_date: "2027-01-01", name: "신정" }],
-    }, "2027-01-01", "2027-01-31");
-    assert.deepEqual(result.leave["2027-01-04"], [["담당", "0.5"]]);
-    assert.equal(result.leave["2027-01-01"], undefined);
+      duties: [duty("2025-12-31", "오후1", "담당")],
+      holidays: [{ holiday_date: "2026-01-01", name: "신정" }],
+    }, "2026-01-01", "2026-01-31");
+    assert.deepEqual(result.leave["2026-01-02"], [["담당", "0.5"]]);
+    assert.equal(result.leave["2026-01-01"], undefined);
+  });
+  // 2026-10-01부터 오후1은 조기퇴근 대신 시간외수당. 규칙은 "당직을 선 날짜" 기준으로 고른다.
+  await check("발효일 직전 오후1은 새 규칙 달로 넘어가도 옛 규칙대로 이월", async () => {
+    const result = await earlyLeave(
+      { duties: [duty("2026-09-30", "오후1", "9월 담당")] },
+      "2026-10-01",
+      "2026-10-31",
+    );
+    assert.deepEqual(result.leave["2026-10-01"], [["9월 담당", "0.5"]]);
+  });
+  await check("발효일 이후 오후1은 조기퇴근 없음, 오전 당직은 그대로", async () => {
+    const result = await earlyLeave(
+      { duties: [duty("2026-10-01", "오후1", "10월 담당"), duty("2026-10-01", "오전2", "오전 담당")] },
+      "2026-10-01",
+      "2026-10-31",
+    );
+    assert.deepEqual(result.leave["2026-10-01"], [["오전 담당", "1.0"]]);
+    assert.equal(result.leave["2026-10-02"], undefined);
+  });
+  await check("슬롯 시간·인쇄 표기도 발효일 기준으로 바뀜", async () => {
+    const { dutySlotsFor } = await loadModule("lib/duty-rules.js");
+    const { dutyHoursAt } = await loadModule("lib/print-config.js");
+    const before = Object.fromEntries(dutySlotsFor("2026-09-30").map((s) => [s.name, s]));
+    const after = Object.fromEntries(dutySlotsFor("2026-10-01").map((s) => [s.name, s]));
+    assert.equal(before.오후1.time, "9:00 ~ 18:30");
+    assert.equal(after.오후1.time, "9:00 ~ 19:00");
+    assert.equal(after.오후1.note, "1시간 시간 외 수당 지급");
+    assert.equal(before.오전1.time, after.오전1.time);
+    assert.deepEqual(
+      dutyHoursAt("2026-10-01").find((h) => h.label === "오후1"),
+      { label: "오후1", time: "오후 4시 30분 ~ 7시" },
+    );
   });
   await check("전월부터 이어지는 긴 연휴도 고정 조회 기간 없이 처리", async () => {
     const holidays = Array.from({ length: 10 }, (_, i) => ({ holiday_date: `2026-08-${22 + i}`, name: "테스트 휴일" }));
@@ -114,4 +143,4 @@ async function main() {
   });
   console.log(`\n${count} checks passed.`);
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+await main().catch(error => { console.error(error); process.exitCode = 1; });

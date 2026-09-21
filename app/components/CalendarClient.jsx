@@ -14,7 +14,7 @@ import {
   weekdayLabels,
 } from "../../lib/calendar";
 import { TYPE_SLUG } from "../../lib/events";
-import { dutySlots } from "../../lib/print-config";
+import { dutySlotsFor } from "../../lib/duty-rules";
 
 import EventModal from "./EventModal";
 import DutyModal from "./DutyModal";
@@ -150,6 +150,8 @@ export default function CalendarClient({
   );
   const offset = firstDayOffset(year, monthIndex);
   const trailingEmptyCount = Math.max(0, 42 - offset - days.length);
+  // 당직 규칙은 발효일에 따라 바뀐다. 범례·인쇄는 이 달 1일 기준 규칙을 쓴다.
+  const monthDutySlots = useMemo(() => dutySlotsFor(monthStart), [monthStart]);
   const dutyPrintTitle = `${displayMonth} 당직 및 조기퇴근`;
   const schedulePrintTitle = `${displayMonth} 일정표`;
   const { visibleEventIds, hiddenEventCounts } = useMemo(
@@ -404,7 +406,7 @@ export default function CalendarClient({
               </div>
               {activeView === "duty" ? (
                 <div className="legend" aria-label="범례">
-                  {dutySlots.map((slot) => (
+                  {monthDutySlots.map((slot) => (
                     <span className={`legend-item ${slot.className}`} key={slot.name}>
                       <i className="legend-dot" />
                       <strong>{slot.name}</strong>
@@ -537,7 +539,12 @@ export default function CalendarClient({
       ) : null}
 
       {activeView === "duty" ? (
-        <PrintSheet weeks={weeks} earlyLeave={earlyLeave} title={dutyPrintTitle} />
+        <PrintSheet
+          weeks={weeks}
+          earlyLeave={earlyLeave}
+          title={dutyPrintTitle}
+          monthStart={monthStart}
+        />
       ) : (
         <SchedulePrintSheet days={days} offset={offset} title={schedulePrintTitle} />
       )}

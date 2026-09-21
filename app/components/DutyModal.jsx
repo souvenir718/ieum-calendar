@@ -4,9 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { EDITABLE_SLOTS } from "../../lib/duties";
-import { dutySlots } from "../../lib/print-config";
-
-const SLOT_TIME = Object.fromEntries(dutySlots.map((s) => [s.name, s.time]));
+import { dutySlotsFor } from "../../lib/duty-rules";
 
 // day: { key, day, weekday, assignments: [[slot, name], ...] }
 // staffList: [{ id, name }] — 담당자 선택지 (이름 unique)
@@ -31,6 +29,12 @@ export default function DutyModal({ day, staffList, onClose, onSaved }) {
   }, [day, nameToId]);
 
   const [form, setForm] = useState(initialForm);
+
+  // 슬롯 근무시간은 발효일 규칙에 따라 달라지므로 편집 중인 날짜 기준으로 뽑는다.
+  const slotTime = useMemo(
+    () => Object.fromEntries(dutySlotsFor(day.key).map((s) => [s.name, s.time])),
+    [day.key],
+  );
 
   const submit = async (e) => {
     e.preventDefault();
@@ -72,7 +76,7 @@ export default function DutyModal({ day, staffList, onClose, onSaved }) {
           <label className="field" key={slot}>
             <span>
               {slot}
-              {SLOT_TIME[slot] ? <em className="duty-slot-time"> {SLOT_TIME[slot]}</em> : null}
+              {slotTime[slot] ? <em className="duty-slot-time"> {slotTime[slot]}</em> : null}
             </span>
             <select
               value={form[slot]}

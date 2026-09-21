@@ -1,12 +1,13 @@
 import { Fragment } from "react";
 import { dutyCellInfo, dutyDateClass } from "../../lib/calendar";
-import { printConfig } from "../../lib/print-config";
+import { dutyHoursAt, printConfig } from "../../lib/print-config";
 
 /**
  * 당직표 및 조기퇴근표 PDF 출력(프린트)을 위한 레이아웃 컴포넌트입니다.
  */
-export default function PrintSheet({ weeks, earlyLeave, title }) {
+export default function PrintSheet({ weeks, earlyLeave, title, monthStart }) {
   const workdayWeeks = weeks.filter((week) => week.slice(0, 5).some(Boolean));
+  const dutyHours = dutyHoursAt(monthStart);
 
   return (
     <div className="print-sheet duty-print-sheet" aria-hidden="true">
@@ -65,13 +66,13 @@ export default function PrintSheet({ weeks, earlyLeave, title }) {
         <tbody>
           <tr>
             <th>표기법</th>
-            {printConfig.dutyHours.map((item) => (
+            {dutyHours.map((item) => (
               <td key={item.label}>{item.label}</td>
             ))}
           </tr>
           <tr>
             <th>당직시간</th>
-            {printConfig.dutyHours.map((item) => (
+            {dutyHours.map((item) => (
               <td key={item.label}>{item.time}</td>
             ))}
           </tr>
