@@ -3,7 +3,9 @@
  */
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-export const MAX_VISIBLE_EVENTS_PER_DAY = 4;
+// 한 날짜 칸에 세로로 쌓아 보여줄 수 있는 최대 레인 수(공휴일·여러 날 일정 포함).
+// 칸 높이(CSS의 --event-stack-top/--event-row-height 기준)에 맞춘 값이라 CSS와 함께 조정할 것.
+export const MAX_EVENT_LANES = 3;
 export const VIEW_STORAGE_KEY = "ieum-calendar-active-view";
 
 // 편집 가능 여부 캐시: 월 이동(라우트 전환)마다 /api/edit-session을 다시 부르지 않도록
@@ -102,46 +104,9 @@ export function sortEvents(eventList) {
   });
 }
 
-export function buildEventVisibility(days, eventList) {
-  const eventById = new Map(eventList.map((event) => [event.id, event]));
-  const visibleEventIds = new Set();
-  const hiddenEventCounts = {};
-
-  for (const day of days) {
-    const multiDayEvents = [];
-    const singleDayEvents = [];
-
-    for (const event of day.events) {
-      const fullEvent = eventById.get(event.id);
-      if (fullEvent && isMultiDayEvent(fullEvent)) {
-        multiDayEvents.push(event);
-      } else {
-        singleDayEvents.push(event);
-      }
-    }
-
-    for (const event of multiDayEvents) {
-      visibleEventIds.add(event.id);
-    }
-
-    const holidaySlotCount = day.holidayName ? 1 : 0;
-    const singleDayLimit = Math.max(
-      MAX_VISIBLE_EVENTS_PER_DAY - multiDayEvents.length - holidaySlotCount,
-      0,
-    );
-    for (const event of singleDayEvents.slice(0, singleDayLimit)) {
-      visibleEventIds.add(event.id);
-    }
-
-    const hiddenCount = Math.max(singleDayEvents.length - singleDayLimit, 0);
-    if (hiddenCount > 0) hiddenEventCounts[day.key] = hiddenCount;
-  }
-
-  return { visibleEventIds, hiddenEventCounts };
-}
-
-export function buildEventSpans(days, eventList, monthStart, monthEnd, offset, visibleEventIds) {
+export function buildEventSpans(days, eventList, monthStart, monthEnd, offset) {
   const spans = [];
+  const hiddenEventCounts = {};
   const rowLanes = new Map();
   const holidayItems = days
     .filter((day) => day.holidayName)
@@ -155,9 +120,7 @@ export function buildEventSpans(days, eventList, monthStart, monthEnd, offset, v
     }));
   const visibleItems = [
     ...holidayItems,
-    ...eventList
-      .filter((event) => visibleEventIds.has(event.id))
-      .map((event) => ({ ...event, kind: "event" })),
+    ...eventList.map((event) => ({ ...event, kind: "event" })),
   ]
     .sort((a, b) => {
       const multiDaySort = Number(isMultiDayEvent(b)) - Number(isMultiDayEvent(a));
@@ -188,6 +151,18 @@ export function buildEventSpans(days, eventList, monthStart, monthEnd, offset, v
       lanes[assignedLane] = [...(lanes[assignedLane] || []), { startCol, endCol }];
       rowLanes.set(row, lanes);
 
+      // 레인이 칸 높이를 넘으면 그리지 않고, 가려진 일정은 날짜별 "+N개"로 집계한다.
+      if (assignedLane >= MAX_EVENT_LANES) {
+        if (event.kind === "event") {
+          for (let d = segmentStart; d <= segmentEnd; d = addDays(d, 1)) {
+            const key = toDateKey(d);
+            hiddenEventCounts[key] = (hiddenEventCounts[key] || 0) + 1;
+          }
+        }
+        segmentStart = addDays(segmentEnd, 1);
+        continue;
+      }
+
       spans.push({
         id: event.id,
         key: `${event.id}-${row}-${startCol}`,
@@ -205,5 +180,5 @@ export function buildEventSpans(days, eventList, monthStart, monthEnd, offset, v
     }
   }
 
-  return spans;
+  return { spans, hiddenEventCounts };
 }

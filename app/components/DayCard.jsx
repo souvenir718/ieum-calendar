@@ -53,7 +53,7 @@ export default function DayCard({
               onMoreClick?.(day);
             }}
           >
-            +{hiddenEventCount}개
+            {day.events.length}개
           </button>
         ) : activeView === "events" && hasEvents ? (
           <span className="event-count">{day.events.length}개</span>

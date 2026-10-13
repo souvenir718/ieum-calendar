@@ -31,7 +31,6 @@ import {
   calendarPosition,
   buildEventsByDay,
   sortEvents,
-  buildEventVisibility,
   buildEventSpans,
   readEditableCache,
   writeEditableCache,
@@ -154,13 +153,9 @@ export default function CalendarClient({
   const monthDutySlots = useMemo(() => dutySlotsFor(monthStart), [monthStart]);
   const dutyPrintTitle = `${displayMonth} 당직 및 조기퇴근`;
   const schedulePrintTitle = `${displayMonth} 일정표`;
-  const { visibleEventIds, hiddenEventCounts } = useMemo(
-    () => buildEventVisibility(days, localEventList),
-    [days, localEventList],
-  );
-  const eventSpans = useMemo(
-    () => buildEventSpans(days, localEventList, monthStart, monthEnd, offset, visibleEventIds),
-    [days, localEventList, monthStart, monthEnd, offset, visibleEventIds],
+  const { spans: eventSpans, hiddenEventCounts } = useMemo(
+    () => buildEventSpans(days, localEventList, monthStart, monthEnd, offset),
+    [days, localEventList, monthStart, monthEnd, offset],
   );
 
   const openAdd = (date) => {
