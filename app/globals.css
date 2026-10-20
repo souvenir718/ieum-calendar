@@ -1882,8 +1882,23 @@ h2 {
   color: #222;
   font-weight: 700;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 긴 일정명이 "…"로 잘리지 않도록 줄바꿈 허용 */
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  /* 아이콘 | 제목 두 칸으로 나눠 둘째 줄부터 제목 시작 위치에 맞춤 */
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.schedule-print-event > span[aria-hidden] {
+  flex: 0 0 auto;
+}
+
+.schedule-print-event-title {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .schedule-print-legend {

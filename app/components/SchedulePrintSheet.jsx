@@ -61,7 +61,7 @@ export default function SchedulePrintSheet({ days, offset, title }) {
                             key={`${day.key}-${event.id}`}
                           >
                             <span aria-hidden="true">{EVENT_TYPE_ICON[event.type] || "📌"}</span>
-                            {event.title}
+                            <span className="schedule-print-event-title">{event.title}</span>
                           </li>
                         ))}
                       </ul>
