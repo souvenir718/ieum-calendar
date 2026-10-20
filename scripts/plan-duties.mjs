@@ -5,6 +5,8 @@
 //
 // 특정 칸을 못박고 나머지만 다시 최적화하려면 --fix 를 반복해서 쓴다.
 //   ... 2026-10 --fix 2026-10-01:오후1=김민경 --fix 2026-10-15:오전1=홍여진
+// 슬롯을 | 로 여러 개 주면 "그 중 하나"라는 뜻이고, 더 나은 쪽을 골라 쓴다.
+//   ... 2026-11 --fix 2026-11-03:오전1|오전2=정지혜
 //   node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --apply    # duties upsert
 //
 // 연차/반차는 events 테이블에서 읽는다(staff_id가 비어 있어 제목의 이름으로 매칭).
@@ -23,14 +25,16 @@ const monthStr = process.argv[2];
 const apply = process.argv.includes("--apply");
 const asJson = process.argv.includes("--json");
 
-// --fix YYYY-MM-DD:슬롯=이름  → { 날짜: { 슬롯: 이름 } }
-const fixed = {};
+// --fix YYYY-MM-DD:슬롯[|슬롯...]=이름 → [{ key, slots, name }]
+const fixRequests = [];
 for (let i = 0; i < process.argv.length; i++) {
   if (process.argv[i] !== "--fix") continue;
   const m = /^(\d{4}-\d{2}-\d{2}):([^=]+)=(.+)$/.exec(process.argv[i + 1] || "");
-  if (!m) { console.error(`--fix 형식 오류: ${process.argv[i + 1]} (예: 2026-10-01:오후1=김민경)`); process.exit(1); }
-  (fixed[m[1]] ||= {})[m[2]] = m[3];
+  if (!m) { console.error(`--fix 형식 오류: ${process.argv[i + 1]} (예: 2026-11-03:오전1|오전2=정지혜)`); process.exit(1); }
+  fixRequests.push({ key: m[1], slots: m[2].split("|").map((x) => x.trim()), name: m[3] });
 }
+// 후보가 여럿이면 조합을 모두 만들어 각각 최적화한 뒤 가장 좋은 것을 쓴다.
+let fixed = {};
 const parsed = parseMonth(monthStr || "");
 if (!parsed) {
   console.error("사용법: node --env-file=.env.local scripts/plan-duties.mjs YYYY-MM [--apply]");
@@ -106,23 +110,47 @@ const carryEarlyLeave = prevKey && earlyLeaveRuleFor(prevKey, "오후1") ? prevD
 
 // 고정 배정 검증 — 규칙상 불가능한 지정은 배정을 시작하기 전에 알려준다.
 const isFixed = (key, slot) => Boolean(fixed[key]?.[slot]);
-for (const [key, slots] of Object.entries(fixed)) {
+
+function fixError(key, slot, name) {
   const d = workdays.find((w) => w.key === key);
-  if (!d) { console.error(`--fix ${key}: 이 달의 근무일이 아닙니다.`); process.exit(1); }
-  for (const [slot, name] of Object.entries(slots)) {
-    if (!SLOTS.includes(slot)) { console.error(`--fix ${key}: 슬롯 ${slot} 은 이 달 배정 대상이 아닙니다.`); process.exit(1); }
-    if (!people.some((p) => p.name === name)) { console.error(`--fix ${key} ${slot}: ${name} 은 당직 대상자가 아닙니다.`); process.exit(1); }
-    if (isBlocked(name, key, slot)) { console.error(`--fix ${key} ${slot}: ${name} 은 연차/반차 중입니다.`); process.exit(1); }
-    if (d === workdays[0] && carryEarlyLeave === name && !MORNING.has(slot)) {
-      console.error(`--fix ${key} ${slot}: ${name} 은 전월 오후1의 조기퇴근이 이월돼 오후 당직을 설 수 없습니다.`);
-      process.exit(1);
-    }
-    if (prevDay[slot] === name && d === workdays[0]) {
-      console.error(`--fix ${key} ${slot}: ${name} 은 직전 근무일에도 같은 슬롯이었습니다.`);
-      process.exit(1);
-    }
+  if (!d) return `${key} 는 이 달의 근무일이 아닙니다.`;
+  if (!SLOTS.includes(slot)) return `슬롯 ${slot} 은 이 달 배정 대상이 아닙니다.`;
+  if (!people.some((p) => p.name === name)) return `${name} 은 당직 대상자가 아닙니다.`;
+  if (isBlocked(name, key, slot)) return `${name} 은 ${key} 에 연차/반차 중입니다.`;
+  if (d === workdays[0] && carryEarlyLeave === name && !MORNING.has(slot)) {
+    return `${name} 은 전월 오후1의 조기퇴근이 이월돼 첫 근무일 오후 당직을 설 수 없습니다.`;
+  }
+  if (d === workdays[0] && prevDay[slot] === name) return `${name} 은 직전 근무일에도 ${slot} 이었습니다.`;
+  return null;
+}
+
+// 후보 슬롯 중 규칙상 가능한 것만 남긴다.
+for (const req of fixRequests) {
+  const reasons = [];
+  req.slots = req.slots.filter((slot) => {
+    const err = fixError(req.key, slot, req.name);
+    if (err) reasons.push(`  ${req.key} ${slot}: ${err}`);
+    return !err;
+  });
+  if (!req.slots.length) {
+    console.error(`--fix ${req.key} = ${req.name} 는 어느 슬롯으로도 배정할 수 없습니다.\n${reasons.join("\n")}`);
+    process.exit(1);
   }
 }
+
+// 후보 조합 전개 — 같은 날 두 지정이 같은 슬롯을 집는 조합은 버린다.
+let fixCombos = [{}];
+for (const req of fixRequests) {
+  const next = [];
+  for (const combo of fixCombos) {
+    for (const slot of req.slots) {
+      if (combo[req.key]?.[slot]) continue;
+      next.push({ ...combo, [req.key]: { ...combo[req.key], [slot]: req.name } });
+    }
+  }
+  fixCombos = next;
+}
+if (!fixCombos.length) { console.error("--fix 지정이 서로 충돌합니다."); process.exit(1); }
 
 // ─────────────────────────────── 목표치
 
@@ -359,13 +387,17 @@ function polish(plan) {
 }
 
 let best = null;
-for (let t = 0; t < RESTARTS; t++) {
-  const candidate = build();
-  if (!candidate) continue;
-  const cost = polish(candidate.plan);
-  if (!best || cost < best.cost) best = { plan: candidate.plan, cost };
+for (const combo of fixCombos) {
+  fixed = combo;
+  for (let t = 0; t < RESTARTS; t++) {
+    const candidate = build();
+    if (!candidate) continue;
+    const cost = polish(candidate.plan);
+    if (!best || cost < best.cost) best = { plan: candidate.plan, cost, fixed: combo };
+  }
 }
 if (!best) { console.error("제약을 만족하는 배정을 찾지 못했습니다."); process.exit(1); }
+fixed = best.fixed;
 
 // ─────────────────────────────── 출력
 
