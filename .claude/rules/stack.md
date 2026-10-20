@@ -26,7 +26,8 @@ node --env-file=.env.local scripts/check-balance.mjs # 당직 누적 균등성 �
 # 월별 당직 초안 생성 — 시드 고정이라 같은 입력이면 같은 결과가 나온다
 node --env-file=.env.local scripts/plan-duties.mjs 2026-10                      # 초안 출력만
 node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --json               # 초안을 JSON으로
-node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --fix 2026-10-01:오후1=김민경
+node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --fix 2026-10-01:오후1=김민경   # 칸 고정
+node --env-file=.env.local scripts/plan-duties.mjs 2026-11 --fix 2026-11-03:오전1\|오전2=정지혜  # 후보 중 택1
 node --env-file=.env.local scripts/plan-duties.mjs 2026-10 --apply              # duties upsert
 ```
 
