@@ -14,7 +14,7 @@ import {
   weekdayLabels,
 } from "../../lib/calendar";
 import { TYPE_SLUG } from "../../lib/events";
-import { dutySlotsFor } from "../../lib/duty-rules";
+import { dutySlotsFor, teacherMeetingDays } from "../../lib/duty-rules";
 
 import EventModal from "./EventModal";
 import DutyModal from "./DutyModal";
@@ -54,6 +54,7 @@ export default function CalendarClient({
   nextMonth,
   assignments,
   holidays,
+  carryMeetingDays = [],
   eventList = [],
   staffList = [],
 }) {
@@ -143,9 +144,14 @@ export default function CalendarClient({
     [year, monthIndex, holidays, localAssignments, localEvents],
   );
   const weeks = useMemo(() => getDutyWeeks(days), [days]);
+  // 교사회의 날 오전 당직은 다음 근무일 조기퇴근(발효일 규칙). 전월 마지막 당직일 회의는 서버가 넘겨준다.
+  const meetingDays = useMemo(
+    () => [...carryMeetingDays, ...teacherMeetingDays(localEventList)],
+    [carryMeetingDays, localEventList],
+  );
   const earlyLeave = useMemo(
-    () => deriveEarlyLeave(localAssignments, holidays),
-    [localAssignments, holidays],
+    () => deriveEarlyLeave(localAssignments, holidays, meetingDays),
+    [localAssignments, holidays, meetingDays],
   );
   const offset = firstDayOffset(year, monthIndex);
   const trailingEmptyCount = Math.max(0, 42 - offset - days.length);

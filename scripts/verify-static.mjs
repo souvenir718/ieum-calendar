@@ -36,6 +36,7 @@ async function main() {
   const { loadMonthDutyData } = await loadModule("lib/calendar-data.js");
   const { parseEventBody } = await loadModule("lib/events.js");
   const { parseDutyBody } = await loadModule("lib/duties.js");
+  const { teacherMeetingDays } = await loadModule("lib/duty-rules.js");
   let count = 0;
   async function check(name, run) {
     await run();
@@ -48,7 +49,10 @@ async function main() {
     const assignments = {};
     for (const row of data.duties) (assignments[row.duty_date] ||= []).push([row.slot, row.staff.name]);
     const holidays = Object.fromEntries(data.holidays.map(row => [row.holiday_date, row.name]));
-    return { data, assignments, leave: calendar.deriveEarlyLeave(assignments, holidays) };
+    // 화면과 같이: 이번 달 일정의 교사회의 + 서버가 넘긴 전월 마지막 당직일 회의
+    const monthEvents = (tables.events || []).filter(row => row.start_date <= monthEnd && row.end_date >= monthStart);
+    const meetingDays = [...data.carryMeetingDays, ...teacherMeetingDays(monthEvents)];
+    return { data, assignments, leave: calendar.deriveEarlyLeave(assignments, holidays, meetingDays) };
   }
 
   await check("전월 말 오후1 → 월초 0.5 조기퇴근, 현재 월 당직 유지", async () => {
@@ -60,7 +64,8 @@ async function main() {
       duty("2026-10-01", "오전1", "다음 달 담당"),
     ] }, "2026-09-01", "2026-09-30");
     assert.deepEqual(result.leave["2026-09-01"], [["이번 달 담당", "1.5"], ["전월 담당", "0.5"]]);
-    assert.equal(result.data.duties.length, 2);
+    // 전월은 마지막 당직일(08-31)의 전 슬롯만 읽는다(교사회의 날 오전 조기퇴근 이월 대비)
+    assert.equal(result.data.duties.length, 3);
     const days = calendar.getMonthDays(2026, 8, { assignments: result.assignments });
     assert.equal(days.length, 30);
     assert.deepEqual(days[0].assignments, [["오전1", "이번 달 담당"]]);
@@ -104,6 +109,66 @@ async function main() {
       dutyHoursAt("2026-10-01").find((h) => h.label === "오후1"),
       { label: "오후1", time: "오후 4시 30분 ~ 7시" },
     );
+  });
+  // 2026-11-01부터 오후1은 다시 18:30 + 다음 근무일 0.5 조기퇴근.
+  await check("10월 말 오후1은 11월로 이월되지 않고, 11월 오후1부터 조기퇴근 복귀", async () => {
+    const result = await earlyLeave(
+      { duties: [duty("2026-10-30", "오후1", "10월 담당"), duty("2026-11-02", "오후1", "11월 담당")] },
+      "2026-11-01",
+      "2026-11-30",
+    );
+    assert.equal(result.leave["2026-11-02"], undefined);
+    assert.deepEqual(result.leave["2026-11-03"], [["11월 담당", "0.5"]]);
+    const { dutySlotsFor } = await loadModule("lib/duty-rules.js");
+    const { dutyHoursAt } = await loadModule("lib/print-config.js");
+    const nov = Object.fromEntries(dutySlotsFor("2026-11-01").map((s) => [s.name, s]));
+    assert.equal(nov.오후1.time, "9:00 ~ 18:30");
+    assert.equal(nov.오후1.note, "다음날 30분 일찍 퇴근");
+    assert.deepEqual(
+      dutyHoursAt("2026-11-01").find((h) => h.label === "오후1"),
+      { label: "오후1", time: "오후 4시 30분 ~ 6시 30분" },
+    );
+  });
+  // 2026-11-01부터 교사회의가 있는 날의 오전1·오전2는 당일 대신 다음 근무일에 조기퇴근.
+  const meeting = (date, title = "교사회의") => ({ title, start_date: date, end_date: date });
+  await check("교사회의 날 오전 당직은 다음 근무일 조기퇴근, 오후1은 그대로", async () => {
+    const result = await earlyLeave(
+      {
+        duties: [
+          duty("2026-11-03", "오전1", "오전1 담당"),
+          duty("2026-11-03", "오전2", "오전2 담당"),
+          duty("2026-11-03", "오후1", "오후1 담당"),
+          duty("2026-11-04", "오전1", "다음날 담당"),
+        ],
+        events: [meeting("2026-11-03")],
+      },
+      "2026-11-01",
+      "2026-11-30",
+    );
+    assert.equal(result.leave["2026-11-03"], undefined);
+    assert.deepEqual(result.leave["2026-11-04"], [
+      ["오전1 담당", "1.5"], ["다음날 담당", "1.5"], ["오전2 담당", "1.0"], ["오후1 담당", "0.5"],
+    ]);
+  });
+  await check("교사회의 규칙은 발효일 이전에는 적용하지 않음", async () => {
+    const result = await earlyLeave(
+      { duties: [duty("2026-10-01", "오전1", "담당")], events: [meeting("2026-10-01", "교사 회의")] },
+      "2026-10-01",
+      "2026-10-31",
+    );
+    assert.deepEqual(result.leave["2026-10-01"], [["담당", "1.5"]]);
+  });
+  await check("전월 마지막 근무일 교사회의의 오전 조기퇴근도 월초로 이월", async () => {
+    const result = await earlyLeave(
+      {
+        duties: [duty("2026-11-30", "오전1", "오전 담당"), duty("2026-11-30", "오후1", "오후 담당")],
+        events: [meeting("2026-11-30")],
+      },
+      "2026-12-01",
+      "2026-12-31",
+    );
+    assert.deepEqual(result.data.carryMeetingDays, ["2026-11-30"]);
+    assert.deepEqual(result.leave["2026-12-01"], [["오전 담당", "1.5"], ["오후 담당", "0.5"]]);
   });
   await check("전월부터 이어지는 긴 연휴도 고정 조회 기간 없이 처리", async () => {
     const holidays = Array.from({ length: 10 }, (_, i) => ({ holiday_date: `2026-08-${22 + i}`, name: "테스트 휴일" }));

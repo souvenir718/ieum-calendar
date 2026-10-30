@@ -108,6 +108,13 @@ const prevDay = prevKey ? prevByDate[prevKey] : {};
 // 전월 오후1 담당자가 조기퇴근 규칙 적용 대상이면 첫 근무일에 오후 당직을 줄 수 없다.
 const carryEarlyLeave = prevKey && earlyLeaveRuleFor(prevKey, "오후1") ? prevDay["오후1"] : null;
 
+// i번째 근무일에 조기퇴근하는 직전 근무일 오후1 담당자(조기퇴근 규칙 기간만). 그날 오후 당직은 불가.
+function earlyLeaverOn(plan, i) {
+  if (i === 0) return carryEarlyLeave;
+  const key = workdays[i - 1].key;
+  return earlyLeaveRuleFor(key, "오후1") ? plan[key]?.["오후1"] ?? null : null;
+}
+
 // 고정 배정 검증 — 규칙상 불가능한 지정은 배정을 시작하기 전에 알려준다.
 const isFixed = (key, slot) => Boolean(fixed[key]?.[slot]);
 
@@ -255,7 +262,7 @@ function build() {
         if (Object.values(today).includes(n)) return false;            // 하루 1회
         if (isBlocked(n, d.key, slot)) return false;                   // 연차/반차
         if (yesterday[slot] === n) return false;                       // 연속 근무일 같은 슬롯 금지
-        if (i === 0 && carryEarlyLeave === n && !MORNING.has(slot)) return false; // 이월 조기퇴근과 충돌
+        if (earlyLeaverOn(plan, i) === n && !MORNING.has(slot)) return false; // 조기퇴근과 충돌
         if (MORNING.has(slot)) {                                       // 같은 반 오전 묶음 금지
           const other = today[slot === "오전1" ? "오전2" : "오전1"];
           if (other && classOf[other] && classOf[other] === classOf[n]) return false;
@@ -311,8 +318,9 @@ function hardViolations(plan) {
       if (isBlocked(t[slot], d.key, slot)) issues.push(`${d.key} ${slot} ${t[slot]} 연차/반차 중 배정`);
       if (prev[slot] === t[slot]) issues.push(`${d.key} ${slot} ${t[slot]} 연속 근무일 같은 슬롯`);
     }
-    if (i === 0 && carryEarlyLeave && t["오후1"] === carryEarlyLeave) {
-      issues.push(`${d.key} 오후1 ${carryEarlyLeave} 이월 조기퇴근과 충돌`);
+    const leaver = earlyLeaverOn(plan, i);
+    if (leaver && t["오후1"] === leaver) {
+      issues.push(`${d.key} 오후1 ${leaver} 전 근무일 오후1의 조기퇴근과 충돌`);
     }
   }
   return issues;

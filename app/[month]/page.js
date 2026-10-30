@@ -106,6 +106,7 @@ export default async function MonthPage({ params }) {
       nextMonth={adjacentMonth(month, 1)}
       assignments={assignments}
       holidays={holidays}
+      carryMeetingDays={dutyData.carryMeetingDays}
       events={events}
       eventList={eventList}
       staffList={staffList}
