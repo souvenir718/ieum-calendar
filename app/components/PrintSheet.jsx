@@ -5,8 +5,10 @@ import { dutyHoursAt, printConfig } from "../../lib/print-config";
 /**
  * 당직표 및 조기퇴근표 PDF 출력(프린트)을 위한 레이아웃 컴포넌트입니다.
  */
-export default function PrintSheet({ weeks, earlyLeave, title, monthStart }) {
+export default function PrintSheet({ weeks, earlyLeave, meetingDays = [], title, monthStart }) {
   const workdayWeeks = weeks.filter((week) => week.slice(0, 5).some(Boolean));
+  // 교사회의 날은 조기퇴근이 당일·다음날로 나뉘므로 날짜 옆에 표시해 둔다.
+  const meetings = new Set(meetingDays);
   const dutyHours = dutyHoursAt(monthStart);
 
   return (
@@ -96,7 +98,10 @@ export default function PrintSheet({ weeks, earlyLeave, title, monthStart }) {
                 <td key={`e-${cellIndex}`}>
                   {day ? (
                     <div className="early-cell">
-                      <span className="early-date">{day.day}/</span>
+                      <span className="early-date">
+                        {day.day}/
+                        {meetings.has(day.key) ? <span className="early-meeting"> 교사회의</span> : null}
+                      </span>
                       {day.holidayName ? (
                         <span className="early-holiday">{day.holidayName}</span>
                       ) : (

@@ -548,6 +548,7 @@ export default function CalendarClient({
         <PrintSheet
           weeks={weeks}
           earlyLeave={earlyLeave}
+          meetingDays={meetingDays}
           title={dutyPrintTitle}
           monthStart={monthStart}
         />
