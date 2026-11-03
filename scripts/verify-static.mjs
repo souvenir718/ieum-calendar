@@ -36,7 +36,7 @@ async function main() {
   const { loadMonthDutyData } = await loadModule("lib/calendar-data.js");
   const { parseEventBody } = await loadModule("lib/events.js");
   const { parseDutyBody } = await loadModule("lib/duties.js");
-  const { teacherMeetingDays } = await loadModule("lib/duty-rules.js");
+  const { daysOffByDate, teacherMeetingDays } = await loadModule("lib/duty-rules.js");
   let count = 0;
   async function check(name, run) {
     await run();
@@ -52,7 +52,9 @@ async function main() {
     // 화면과 같이: 이번 달 일정의 교사회의 + 서버가 넘긴 전월 마지막 당직일 회의
     const monthEvents = (tables.events || []).filter(row => row.start_date <= monthEnd && row.end_date >= monthStart);
     const meetingDays = [...data.carryMeetingDays, ...teacherMeetingDays(monthEvents)];
-    return { data, assignments, leave: calendar.deriveEarlyLeave(assignments, holidays, meetingDays) };
+    const names = [...new Set(data.duties.map(row => row.staff.name))];
+    const daysOff = daysOffByDate(monthEvents, names);
+    return { data, assignments, leave: calendar.deriveEarlyLeave(assignments, holidays, meetingDays, daysOff) };
   }
 
   await check("전월 말 오후1 → 월초 0.5 조기퇴근, 현재 월 당직 유지", async () => {
@@ -169,6 +171,50 @@ async function main() {
     );
     assert.deepEqual(result.data.carryMeetingDays, ["2026-11-30"]);
     assert.deepEqual(result.leave["2026-12-01"], [["오전 담당", "1.0"], ["오후 담당", "0.5"]]);
+  });
+  // 2026-11 당직의 다음 근무일 조기퇴근이 본인 연차와 겹치면 본인의 그다음 근무일로 미룬다.
+  const dayOff = (name, start, end = start) => ({ type: "연차", title: `${name} 연차`, start_date: start, end_date: end });
+  await check("다음 근무일이 본인 연차면 조기퇴근을 그다음 근무일로(주말 건너뜀)", async () => {
+    const result = await earlyLeave(
+      {
+        duties: [
+          duty("2026-11-03", "오후1", "홍여진"),
+          duty("2026-11-05", "오후1", "김민경"),
+          duty("2026-11-05", "오전1", "어영경"),
+        ],
+        events: [dayOff("홍여진", "2026-11-04"), dayOff("김민경", "2026-11-06")],
+      },
+      "2026-11-01",
+      "2026-11-30",
+    );
+    assert.equal(result.leave["2026-11-04"], undefined);
+    assert.deepEqual(result.leave["2026-11-05"], [["어영경", "1.5"], ["홍여진", "0.5"]]);
+    assert.equal(result.leave["2026-11-06"], undefined);
+    assert.deepEqual(result.leave["2026-11-09"], [["김민경", "0.5"]]);
+  });
+  await check("연차 미루기는 발효일 이전 당직에 소급하지 않음, 다른 사람 연차는 무관", async () => {
+    const result = await earlyLeave(
+      {
+        duties: [duty("2026-09-03", "오후1", "담당"), duty("2026-09-04", "오후1", "다른 담당")],
+        events: [dayOff("담당", "2026-09-04"), { type: "연차", title: "명단 밖 연차", start_date: "2026-09-07", end_date: "2026-09-07" }],
+      },
+      "2026-09-01",
+      "2026-09-30",
+    );
+    assert.deepEqual(result.leave["2026-09-04"], [["담당", "0.5"]]);
+    assert.deepEqual(result.leave["2026-09-07"], [["다른 담당", "0.5"]]);
+  });
+  await check("연차 미루기는 2026-11 당직까지만(12월 당직은 미루지 않음)", async () => {
+    const result = await earlyLeave(
+      {
+        duties: [duty("2026-11-30", "오후1", "11월 담당"), duty("2026-12-01", "오후1", "12월 담당")],
+        events: [dayOff("11월 담당", "2026-12-01"), dayOff("12월 담당", "2026-12-02")],
+      },
+      "2026-12-01",
+      "2026-12-31",
+    );
+    assert.equal(result.leave["2026-12-01"], undefined);
+    assert.deepEqual(result.leave["2026-12-02"], [["11월 담당", "0.5"], ["12월 담당", "0.5"]]);
   });
   await check("전월부터 이어지는 긴 연휴도 고정 조회 기간 없이 처리", async () => {
     const holidays = Array.from({ length: 10 }, (_, i) => ({ holiday_date: `2026-08-${22 + i}`, name: "테스트 휴일" }));
