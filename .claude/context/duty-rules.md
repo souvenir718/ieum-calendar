@@ -10,6 +10,7 @@
   - 소비처: `deriveEarlyLeave`(파생), `dutySlotsFor`(범례·당직 모달), `dutyHoursAt`(인쇄 당직시간), `check-rule.mjs`(제약 판정).
 - 조기퇴근 파생(`deriveEarlyLeave`): 오전1→당일 1.5h, 오전2→당일 1.0h, 오후1→**다음 근무일**(주말·공휴일 제외) 0.5h (**2026-10-01 ~ 10-31 한 달만** 오후1은 조기퇴근 없이 9:00~19:00 + 1시간 시간외수당. 2026-11-01 원복).
 - **교사회의 날 오전 조기퇴근 분할**(2026-11-01~): 오전1·오전2 규칙의 `earlyLeave.onMeetingDay: [{ when, hours }, ...]`. 일정 제목에 "교사회의"(공백 무관, `isTeacherMeeting`)가 있는 날이면 when/hours 대신 이 목록대로 나눈다 — 오전1 당일 0.5 + 다음 근무일 1.0, 오전2 당일 0.5 + 다음 근무일 0.5. `deriveEarlyLeave(assignments, holidays, meetingDays)`의 세 번째 인자로 회의 날짜를 받고, 전월 마지막 당직일 회의는 `loadMonthDutyData`의 `carryMeetingDays`로 넘어온다(그래서 전월은 마지막 당직일의 전 슬롯을 읽는다).
+- **연차와 겹치는 다음 근무일 조기퇴근 미루기**(`DAY_OFF_SHIFT` = 2026-11-01 ~ 11-30 당직 한정, 연장 시 `to` 수정): `deriveEarlyLeave`의 네 번째 인자 `daysOff`(`{ 날짜: [이름] }`, `daysOffByDate(eventList, 명단)`이 `연차` 일정 제목의 이름으로 만든다)에 본인이 있으면 그다음 근무일로 미룬다. `sameDay`와 반차는 대상 아님. 이전 달은 소급하지 않는다.
 - 2026-10 한 달은 "오후1 담당자는 다음 근무일 오후 당직 금지" 제약이 해제됐다(연속 근무는 지양 → `check-rule.mjs`가 `[지양]`으로 안내). 조기퇴근이 있는 기간에는 `plan-duties.mjs`가 이 제약을 하드로 지킨다(월초 이월 포함).
 - 배정 제약(반 겹침, 연속일 같은 슬롯 금지, 요일 균등 등)의 전체 명세는 `README.md`와 `docs/당직규칙.md`에 있고, `scripts/check-rule.mjs`로 점검한다.
 - 월별 배정은 `scripts/plan-duties.mjs`로 생성한다(연차는 `events`의 제목에서 이름을 매칭). **요일 쏠림은 한 달 안에서만 균등을 봐선 안 되고 달을 넘어 누적되므로**, 플래너가 이전 달들의 요일·슬롯·보상 분포까지 보정한다. 누적 상태는 `scripts/check-balance.mjs`로 확인.
