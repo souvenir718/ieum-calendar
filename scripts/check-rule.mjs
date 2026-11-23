@@ -2,8 +2,7 @@
 // 판정 기준은 그 날짜에 발효 중인 규칙(lib/duty-rules.js)에 따라 달라진다.
 //
 // 오후1에 조기퇴근이 있는 기간(~2026-09, 2026-11~):
-//  - 다음 근무일 오후1/오후2 = 하드 위반(조기퇴근과 물리적으로 충돌)
-//  - 다음 근무일 오전1/오전2 = 소프트 위반(다음날 당직 없어야 함)
+//  - 다음 근무일 당직(오전·오후 모두) = 하드 위반(조기퇴근 날은 당직 불가)
 // 오후1이 시간외수당으로 바뀐 기간(2026-10 한 달):
 //  - 배정 제약은 해제됐으므로 위반이 아니다. 다만 연속 근무는 지양이라 안내로만 출력한다.
 //
@@ -55,8 +54,7 @@ for (let i = 0; i < dates.length - 1; i++) {
     advisories.push({ date: d, person: pm1, next, hitSlots });
     continue;
   }
-  const isAfternoon = hitSlots.some((s) => s === "오후1" || s === "오후2");
-  violations.push({ date: d, person: pm1, next, hitSlots, severity: isAfternoon ? "하드" : "소프트" });
+  violations.push({ date: d, person: pm1, next, hitSlots, severity: "하드" });
 }
 
 console.log(
