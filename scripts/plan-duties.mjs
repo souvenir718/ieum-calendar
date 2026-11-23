@@ -166,18 +166,8 @@ const availability = Object.fromEntries(people.map((p) => [
   p.name,
   workdays.filter((d) => blocked.get(p.name).get(d.key) !== "종일").length,
 ]));
-const prevMonthCount = Object.fromEntries(people.map((p) => [p.name, 0]));
-for (const r of prevRes.data) if (r.staff?.name) prevMonthCount[r.staff.name] += 1;
-
-// 근무 가능일이 많은 사람부터 나머지 1회를 더 맡는다.
-const ranked = [...people].sort((a, b) =>
-  availability[b.name] - availability[a.name]
-  || prevMonthCount[a.name] - prevMonthCount[b.name]
-  || a.name.localeCompare(b.name, "ko"));
-const base = Math.floor(totalNeeded / people.length);
-const extra = totalNeeded % people.length;
+// 1인 목표 횟수는 아래 누적 이력을 읽은 뒤 정한다(target).
 const target = {};
-ranked.forEach((p, i) => { target[p.name] = base + (i < extra ? 1 : 0); });
 
 // ─────────────────────────────── 배정
 
@@ -226,6 +216,26 @@ const cumSlotExpected = Object.fromEntries(
   SLOTS.map((x) => [x, (priorSlotAll[x] + workdays.length) / people.length]),
 );
 const cumTotalExpected = (priorAll + totalNeeded) / people.length;
+
+// 이번 달 목표 = 누적 기대치까지 모자란 만큼. 한 달 안에서만 나누면 나머지 1회가 같은 사람에게
+// 거듭 몰려 누적 차이가 벌어진다(07~12월 정지혜 57 vs 54). 남거나 모자란 횟수는 누적이 적은 사람부터
+// 더하고 많은 사람부터 뺀다. 근무 가능일을 넘지 않는다.
+for (const p of people) {
+  target[p.name] = Math.max(0, Math.min(availability[p.name], Math.floor(cumTotalExpected - priorTotal[p.name])));
+}
+const cumAfter = (p) => priorTotal[p.name] + target[p.name];
+const byCum = (dir) => (a, b) => dir * (cumAfter(a) - cumAfter(b))
+  || availability[b.name] - availability[a.name] || a.name.localeCompare(b.name, "ko");
+let leftover = totalNeeded - people.reduce((a, p) => a + target[p.name], 0);
+while (leftover > 0) {
+  const p = people.filter((x) => target[x.name] < availability[x.name]).sort(byCum(1))[0];
+  if (!p) break;
+  target[p.name] += 1; leftover -= 1;
+}
+while (leftover < 0) {
+  const p = people.filter((x) => target[x.name] > 0).sort(byCum(-1))[0];
+  target[p.name] -= 1; leftover += 1;
+}
 
 // 이번 달 각 슬롯이 조기퇴근인지 시간외수당인지는 발효일 규칙이 정한다.
 const slotEarlyHours = Object.fromEntries(SLOTS.map((x) => {
