@@ -303,7 +303,8 @@ export default function CalendarClient({
 
   return (
     <>
-      <div className="app-shell">
+      {/* 12월 페이지에만 가벼운 크리스마스 테마 (globals.css의 .is-xmas) */}
+      <div className={monthIndex === 11 ? "app-shell is-xmas" : "app-shell"}>
         <header className="topbar">
           <Image
             className="brand-logo"

@@ -2025,6 +2025,89 @@ h2 {
   text-align: left;
 }
 
+/* 12월 페이지 한정 크리스마스 테마 — 달력 뒤로 눈이 내리는 배경 + 월 라벨 트리 */
+body:has(.app-shell.is-xmas) {
+  background: linear-gradient(180deg, #e4ece7, #eef1ec 70%) fixed;
+  background-color: #eef1ec;
+}
+
+/* 눈 레이어 2장(먼 눈/가까운 눈). 타일 높이만큼 transform으로 내려 끊김 없이 반복 — 리페인트 없이 합성만 */
+body:has(.app-shell.is-xmas)::before,
+body:has(.app-shell.is-xmas)::after {
+  content: "";
+  position: fixed;
+  inset: -240px 0 0;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+}
+
+body:has(.app-shell.is-xmas)::before {
+  --flake: #fff 0 1.8px, rgba(140, 164, 180, 0.42) 2.4px, transparent 3.1px;
+  background:
+    radial-gradient(circle at 12% 18%, var(--flake)),
+    radial-gradient(circle at 47% 62%, var(--flake)),
+    radial-gradient(circle at 78% 30%, var(--flake)),
+    radial-gradient(circle at 30% 88%, var(--flake));
+  background-size: 240px 240px;
+  opacity: 0.9;
+  animation: xmas-snow-far 14s linear infinite;
+}
+
+body:has(.app-shell.is-xmas)::after {
+  --flake: #fff 0 2.8px, rgba(140, 164, 180, 0.45) 3.5px, transparent 4.3px;
+  inset: -360px 0 0;
+  background:
+    radial-gradient(circle at 20% 40%, var(--flake)),
+    radial-gradient(circle at 68% 12%, var(--flake)),
+    radial-gradient(circle at 88% 74%, var(--flake));
+  background-size: 360px 360px;
+  animation: xmas-snow-near 10s linear infinite;
+}
+
+@keyframes xmas-snow-far {
+  50% { transform: translate(10px, 120px); }
+  to { transform: translate(0, 240px); }
+}
+
+@keyframes xmas-snow-near {
+  50% { transform: translate(-16px, 180px); }
+  to { transform: translate(0, 360px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(.app-shell.is-xmas)::before,
+  body:has(.app-shell.is-xmas)::after {
+    animation: none;
+  }
+}
+
+/* 12월엔 달력 칸을 살짝 비치게 해서 뒤로 눈이 지나가는 게 보이도록 */
+.is-xmas .calendar-panel {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* 상단 툴바는 비치지 않게 — 기존(흰 82% + 베이지 배경) 합성색 그대로 */
+.is-xmas .calendar-toolbar {
+  background: #fdfcfb;
+}
+
+.is-xmas .day-card {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.is-xmas .day-card.is-weekend,
+.is-xmas .day-card.is-holiday {
+  background: rgba(255, 253, 253, 0.5);
+}
+
+.is-xmas .month-switch-label strong::after {
+  content: "🎄";
+  content: "🎄" / "";
+  margin-left: 3px;
+  font-size: 0.85em;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -2039,6 +2122,11 @@ h2 {
 
   body {
     background: #ffffff;
+  }
+
+  body::before,
+  body::after {
+    display: none !important;
   }
 
   .app-shell {
