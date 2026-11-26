@@ -14,7 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { dateKey, daysInMonth, parseMonth, weekdayLabels } from "../lib/calendar.js";
-import { earlyLeaveRuleFor, leavesEarlyNextWorkday, teacherMeetingDays } from "../lib/duty-rules.js";
+import { DAY_OFF_SHIFT, earlyLeaveRuleFor, leavesEarlyNextWorkday, teacherMeetingDays } from "../lib/duty-rules.js";
 
 const SLOTS = ["오전1", "오전2", "오후1"];
 const MORNING = new Set(["오전1", "오전2"]);
@@ -125,6 +125,18 @@ function earlyLeaversOn(plan, i) {
   return nextDayLeavers(key, plan[key]);
 }
 
+// i번째 근무일 slot 당직의 다음 근무일 조기퇴근이 본인 연차 날에 떨어지면 조기퇴근을 못 쓰게 되므로 배정 금지.
+// DAY_OFF_SHIFT 기간은 조기퇴근이 그다음 근무일로 미뤄지므로 제외. 반차는 대상 아님(deriveEarlyLeave와 동일).
+// shortcut: 연차를 이번 달 근무일만 읽어 월말 마지막 근무일 → 다음 달 첫 근무일 연차는 못 본다. 필요하면 events 조회 범위를 넓힐 것.
+const inDayOffShift = (key) => key >= DAY_OFF_SHIFT.from && (!DAY_OFF_SHIFT.to || key <= DAY_OFF_SHIFT.to);
+function earlyLeaveOnDayOff(i, slot, name) {
+  const key = workdays[i].key;
+  const next = workdays[i + 1];
+  if (!next || inDayOffShift(key)) return false;
+  if (!leavesEarlyNextWorkday(key, slot, meetingDays.has(key))) return false;
+  return blocked.get(name).get(next.key) === "종일";
+}
+
 // 고정 배정 검증 — 규칙상 불가능한 지정은 배정을 시작하기 전에 알려준다.
 const isFixed = (key, slot) => Boolean(fixed[key]?.[slot]);
 
@@ -134,6 +146,9 @@ function fixError(key, slot, name) {
   if (!SLOTS.includes(slot)) return `슬롯 ${slot} 은 이 달 배정 대상이 아닙니다.`;
   if (!people.some((p) => p.name === name)) return `${name} 은 당직 대상자가 아닙니다.`;
   if (isBlocked(name, key, slot)) return `${name} 은 ${key} 에 연차/반차 중입니다.`;
+  if (earlyLeaveOnDayOff(workdays.indexOf(d), slot, name)) {
+    return `${name} 은 다음 근무일이 연차라 ${key} ${slot} 의 조기퇴근을 쓸 수 없습니다.`;
+  }
   if (d === workdays[0] && carryEarlyLeave.includes(name)) {
     return `${name} 은 전월 마지막 근무일 당직의 조기퇴근이 이월돼 첫 근무일에 당직을 설 수 없습니다.`;
   }
@@ -281,6 +296,7 @@ function build() {
         const n = p.name;
         if (Object.values(today).includes(n)) return false;            // 하루 1회
         if (isBlocked(n, d.key, slot)) return false;                   // 연차/반차
+        if (earlyLeaveOnDayOff(i, slot, n)) return false;              // 다음 근무일 조기퇴근이 연차 날
         if (yesterday[slot] === n) return false;                       // 연속 근무일 같은 슬롯 금지
         if (earlyLeaversOn(plan, i).includes(n)) return false;         // 전 근무일 당직의 조기퇴근 날
         if (MORNING.has(slot)) {                                       // 같은 반 오전 묶음 금지
@@ -336,6 +352,7 @@ function hardViolations(plan) {
     const prev = i === 0 ? prevDay : plan[workdays[i - 1].key];
     for (const slot of SLOTS) {
       if (isBlocked(t[slot], d.key, slot)) issues.push(`${d.key} ${slot} ${t[slot]} 연차/반차 중 배정`);
+      if (earlyLeaveOnDayOff(i, slot, t[slot])) issues.push(`${d.key} ${slot} ${t[slot]} 다음 근무일 조기퇴근이 연차 날`);
       if (prev[slot] === t[slot]) issues.push(`${d.key} ${slot} ${t[slot]} 연속 근무일 같은 슬롯`);
     }
     const leavers = earlyLeaversOn(plan, i);
