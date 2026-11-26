@@ -169,6 +169,30 @@ export default function CalendarClient({
     [days, localEventList, monthStart, monthEnd, offset],
   );
 
+  // 화면에서 숨겨진 인쇄 시트를 화면 밖에 잠깐 펼쳐 PNG로 캡처한다.
+  const downloadImage = async () => {
+    const sheet = document.querySelector(".print-sheet");
+    if (!sheet) return;
+    const { toPng } = await import("html-to-image");
+    sheet.classList.add("is-capturing");
+    try {
+      const dataUrl = await toPng(sheet, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        // 복제본에는 화면 밖 위치를 빼야 이미지 안에 그려진다.
+        style: { position: "static", left: "0" },
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `${activeView === "duty" ? dutyPrintTitle : schedulePrintTitle}.png`;
+      link.click();
+    } catch {
+      alert("이미지를 만들지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      sheet.classList.remove("is-capturing");
+    }
+  };
+
   const openAdd = (date) => {
     const d = date || todayKey();
     setModal({ type: "행사", title: "", start_date: d, end_date: d });
@@ -398,9 +422,14 @@ export default function CalendarClient({
                 <button
                   className="print-button"
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={downloadImage}
+                  aria-label="이미지 다운로드"
+                  title="이미지 다운로드"
                 >
-                  PDF 출력하기
+                  <svg className="print-button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" />
+                  </svg>
+                  <span className="print-button-label">이미지 다운로드</span>
                 </button>
                 {activeView === "duty" ? (
                   <LockControl

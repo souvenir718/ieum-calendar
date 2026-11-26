@@ -235,6 +235,9 @@ h2 {
 }
 
 .print-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--blue);
   border-radius: 999px;
   background: var(--blue);
@@ -248,6 +251,16 @@ h2 {
 
 .print-button:hover {
   filter: brightness(1.06);
+}
+
+.print-button-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .lock-button {
@@ -1387,7 +1400,12 @@ h2 {
     background: var(--bg);
   }
 
+  /* 모바일은 아이콘만 보여 준다. */
   .print-button {
+    padding: 6px;
+  }
+
+  .print-button-label {
     display: none;
   }
 
@@ -1666,6 +1684,22 @@ h2 {
    ─────────────────────────────────────────────── */
 .print-sheet {
   display: none;
+}
+
+/* 이미지 다운로드 캡처 중에만 화면 밖에 A4 폭으로 펼친다(96dpi 기준, 여백 8mm). */
+.print-sheet.is-capturing {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 210mm;
+  padding: 8mm;
+  background: #ffffff;
+  color: #000;
+}
+
+.schedule-print-sheet.is-capturing {
+  width: 297mm;
 }
 
 .print-sheet * {
