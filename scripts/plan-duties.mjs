@@ -14,7 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { dateKey, daysInMonth, parseMonth, weekdayLabels } from "../lib/calendar.js";
-import { earlyLeaveRuleFor } from "../lib/duty-rules.js";
+import { earlyLeaveRuleFor, leavesEarlyNextWorkday, teacherMeetingDays } from "../lib/duty-rules.js";
 
 const SLOTS = ["오전1", "오전2", "오후1"];
 const MORNING = new Set(["오전1", "오전2"]);
@@ -55,7 +55,7 @@ const monthEnd = dateKey(year, monthIndex, daysInMonth(year, monthIndex));
 
 // ─────────────────────────────── 데이터 수집
 
-const [staffRes, holidayRes, eventRes, prevRes, historyRes] = await Promise.all([
+const [staffRes, holidayRes, eventRes, prevRes, historyRes, meetingRes] = await Promise.all([
   sb.from("staff").select("id, name, class_name, is_duty_eligible").order("sort_order"),
   sb.from("holidays").select("holiday_date, name").gte("holiday_date", monthStart).lte("holiday_date", monthEnd),
   sb.from("events").select("type, title, start_date, end_date")
@@ -63,8 +63,11 @@ const [staffRes, holidayRes, eventRes, prevRes, historyRes] = await Promise.all(
   sb.from("duties").select("duty_date, slot, staff:staff_id(name)")
     .lt("duty_date", monthStart).order("duty_date", { ascending: false }).limit(12),
   sb.from("duties").select("duty_date, slot, staff:staff_id(name)").lt("duty_date", monthStart),
+  // 교사회의 날 오전 당직은 조기퇴근 일부가 다음 근무일로 넘어간다(전월 마지막 근무일 것까지 보려고 한 달 앞부터 조회).
+  sb.from("events").select("title, start_date, end_date").ilike("title", "%회의%")
+    .lte("start_date", monthEnd).gte("end_date", new Date(Date.UTC(year, monthIndex - 1, 1)).toISOString().slice(0, 10)),
 ]);
-for (const r of [staffRes, holidayRes, eventRes, prevRes, historyRes]) {
+for (const r of [staffRes, holidayRes, eventRes, prevRes, historyRes, meetingRes]) {
   if (r.error) { console.error("조회 실패:", r.error.message); process.exit(1); }
 }
 
@@ -105,14 +108,21 @@ const prevByDate = {};
 for (const r of prevRes.data) (prevByDate[r.duty_date] ||= {})[r.slot] = r.staff?.name;
 const prevKey = Object.keys(prevByDate).sort().pop();
 const prevDay = prevKey ? prevByDate[prevKey] : {};
-// 전월 오후1 담당자가 조기퇴근 규칙 적용 대상이면 첫 근무일에 당직을 줄 수 없다.
-const carryEarlyLeave = prevKey && earlyLeaveRuleFor(prevKey, "오후1") ? prevDay["오후1"] : null;
+const meetingDays = new Set(teacherMeetingDays(meetingRes.data));
 
-// i번째 근무일에 조기퇴근하는 직전 근무일 오후1 담당자(조기퇴근 규칙 기간만). 그날은 오전·오후 모두 당직 불가.
-function earlyLeaverOn(plan, i) {
+// key 날 당직 중 다음 근무일에 조기퇴근하는 사람들 — 오후1, 그리고 교사회의 날의 오전1·오전2.
+// 조기퇴근 날은 오전·오후 모두 당직 불가.
+const nextDayLeavers = (key, day) => Object.entries(day || {})
+  .filter(([slot, name]) => name && leavesEarlyNextWorkday(key, slot, meetingDays.has(key)))
+  .map(([, name]) => name);
+// 전월 마지막 근무일에서 이월된 조기퇴근자는 첫 근무일에 당직을 줄 수 없다.
+const carryEarlyLeave = prevKey ? nextDayLeavers(prevKey, prevDay) : [];
+
+// i번째 근무일에 조기퇴근하는(직전 근무일 당직에서 넘어온) 사람들
+function earlyLeaversOn(plan, i) {
   if (i === 0) return carryEarlyLeave;
   const key = workdays[i - 1].key;
-  return earlyLeaveRuleFor(key, "오후1") ? plan[key]?.["오후1"] ?? null : null;
+  return nextDayLeavers(key, plan[key]);
 }
 
 // 고정 배정 검증 — 규칙상 불가능한 지정은 배정을 시작하기 전에 알려준다.
@@ -124,8 +134,8 @@ function fixError(key, slot, name) {
   if (!SLOTS.includes(slot)) return `슬롯 ${slot} 은 이 달 배정 대상이 아닙니다.`;
   if (!people.some((p) => p.name === name)) return `${name} 은 당직 대상자가 아닙니다.`;
   if (isBlocked(name, key, slot)) return `${name} 은 ${key} 에 연차/반차 중입니다.`;
-  if (d === workdays[0] && carryEarlyLeave === name) {
-    return `${name} 은 전월 오후1의 조기퇴근이 이월돼 첫 근무일에 당직을 설 수 없습니다.`;
+  if (d === workdays[0] && carryEarlyLeave.includes(name)) {
+    return `${name} 은 전월 마지막 근무일 당직의 조기퇴근이 이월돼 첫 근무일에 당직을 설 수 없습니다.`;
   }
   if (d === workdays[0] && prevDay[slot] === name) return `${name} 은 직전 근무일에도 ${slot} 이었습니다.`;
   return null;
@@ -272,7 +282,7 @@ function build() {
         if (Object.values(today).includes(n)) return false;            // 하루 1회
         if (isBlocked(n, d.key, slot)) return false;                   // 연차/반차
         if (yesterday[slot] === n) return false;                       // 연속 근무일 같은 슬롯 금지
-        if (earlyLeaverOn(plan, i) === n) return false;                // 전 근무일 오후1의 조기퇴근 날
+        if (earlyLeaversOn(plan, i).includes(n)) return false;         // 전 근무일 당직의 조기퇴근 날
         if (MORNING.has(slot)) {                                       // 같은 반 오전 묶음 금지
           const other = today[slot === "오전1" ? "오전2" : "오전1"];
           if (other && classOf[other] && classOf[other] === classOf[n]) return false;
@@ -328,9 +338,9 @@ function hardViolations(plan) {
       if (isBlocked(t[slot], d.key, slot)) issues.push(`${d.key} ${slot} ${t[slot]} 연차/반차 중 배정`);
       if (prev[slot] === t[slot]) issues.push(`${d.key} ${slot} ${t[slot]} 연속 근무일 같은 슬롯`);
     }
-    const leaver = earlyLeaverOn(plan, i);
+    const leavers = earlyLeaversOn(plan, i);
     for (const slot of SLOTS) {
-      if (leaver && t[slot] === leaver) issues.push(`${d.key} ${slot} ${leaver} 전 근무일 오후1의 조기퇴근 날 당직`);
+      if (leavers.includes(t[slot])) issues.push(`${d.key} ${slot} ${t[slot]} 전 근무일 당직의 조기퇴근 날 당직`);
     }
   }
   return issues;
@@ -428,7 +438,8 @@ const { count, slotCount, wdCount } = stats(plan);
 console.log(`\n■ ${year}년 ${monthIndex + 1}월 당직 초안  (근무일 ${workdays.length}일 × ${SLOTS.length}슬롯 = ${totalNeeded}건, 비용 ${best.cost})`);
 console.log(`  공휴일 제외: ${Object.entries(holidays).map(([k, v]) => `${k.slice(5)} ${v}`).join(", ") || "없음"}`);
 console.log(`  전월 마지막 근무일 ${prevKey}: ${SLOTS.map((s) => `${s} ${prevDay[s] ?? "-"}`).join(" / ")}`);
-console.log(`  이월 조기퇴근: ${carryEarlyLeave ? `${carryEarlyLeave} (첫 근무일 당직 제외)` : "없음"}`);
+console.log(`  이월 조기퇴근: ${carryEarlyLeave.length ? `${carryEarlyLeave.join(", ")} (첫 근무일 당직 제외)` : "없음"}`);
+console.log(`  교사회의: ${[...meetingDays].filter((k) => k >= monthStart && k <= monthEnd).join(", ") || "없음"}`);
 for (const [key, slots] of Object.entries(fixed)) {
   for (const [slot, name] of Object.entries(slots)) console.log(`  📌 고정: ${key} ${slot} = ${name}`);
 }
