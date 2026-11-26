@@ -36,6 +36,7 @@
 - `app/components/calendarUtils.js` — 이벤트 바 레이아웃(주 단위 span 분할 + 레인 배치).
 - `lib/events.js` / `lib/duties.js` — 입력 검증 + 상수 (라우트·UI 공용).
 - `lib/print-config.js` — 인쇄 레이아웃/범례 상수 (DB 아님).
+- 출력물 이미지 다운로드: 화면에서 숨겨진 `PrintSheet`/`SchedulePrintSheet`(`.print-sheet`)에 `.is-capturing`을 잠깐 붙여 화면 밖 A4 폭으로 펼친 뒤 `html-to-image`로 PNG 캡처한다(`CalendarClient`의 `downloadImage`). 출력 시트 스타일을 바꾸면 이미지에도 그대로 반영된다.
 
 ## 도메인 상세는 온디맨드 참조
 
